@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/cmplx"
 	"math/rand"
+	"sort"
 
 	"gonum.org/v1/gonum/mat"
 
@@ -65,15 +66,62 @@ func main() {
 	}
 	fmt.Printf("\n")
 
-	ranks := make([]float64, Size)
-	graph := pagerank.NewGraph64()
+	type Rank struct {
+		Rank float64
+		Node int
+	}
+	merged := make(map[int]bool)
+	for {
+		graph, ranks := pagerank.NewGraph64(), make([]Rank, Size)
+		for i := 0; i < Size; i++ {
+			for j := 0; j < Size; j++ {
+				graph.Link(uint64(i), uint64(j), adjacency.At(i, j))
+			}
+		}
+		graph.Rank(0.85, 0.000001, func(node uint64, rank float64) {
+			ranks[node] = Rank{
+				Rank: rank,
+				Node: int(node),
+			}
+		})
+		sort.Slice(ranks, func(i, j int) bool {
+			return ranks[i].Rank > ranks[j].Rank
+		})
+		a, b, found := -1, -1, 0
+		for i := 0; i < Size; i++ {
+			if !merged[ranks[i].Node] {
+				fmt.Println(ranks[i].Node)
+				if ranks[i].Node < 5 {
+					if a == -1 {
+						a = ranks[i].Node
+						found++
+					}
+				} else {
+					if b == -1 {
+						b = ranks[i].Node
+						found++
+					}
+				}
+			}
+			if found == 2 {
+				break
+			}
+		}
+		if found != 2 {
+			break
+		}
+		adjacency.Set(a, b, 1)
+		adjacency.Set(b, a, 1)
+		merged[a] = true
+		merged[b] = true
+		fmt.Println(ranks)
+	}
+
 	for i := 0; i < Size; i++ {
 		for j := 0; j < Size; j++ {
-			graph.Link(uint64(i), uint64(j), adjacency.At(i, j))
+			fmt.Printf(" %.0f", adjacency.At(i, j))
 		}
+		fmt.Printf("\n")
 	}
-	graph.Rank(0.85, 0.000001, func(node uint64, rank float64) {
-		ranks[node] = rank
-	})
-	fmt.Println(ranks)
+	fmt.Printf("\n")
 }
