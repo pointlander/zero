@@ -10,22 +10,29 @@ import (
 	"math/rand"
 
 	"gonum.org/v1/gonum/mat"
+
+	"github.com/pointlander/pagerank"
 )
 
 const (
 	// Size is the size of the square matrix
-	Size = 5
+	Size = 10
 )
 
 func main() {
 	rand.Seed(1)
 
 	data := []float64{
-		0, 1, 0, 1, 1,
-		1, 0, 1, 0, 1,
-		0, 1, 0, 1, 1,
-		1, 0, 1, 0, 1,
-		1, 1, 1, 1, 1,
+		0, 1, 0, 1, 1, 0, 0, 0, 0, 0,
+		1, 0, 1, 0, 1, 0, 0, 0, 0, 0,
+		0, 1, 0, 1, 1, 0, 0, 0, 0, 0,
+		1, 0, 1, 0, 1, 0, 0, 0, 0, 0,
+		1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 1, 0, 1, 1,
+		0, 0, 0, 0, 0, 1, 0, 1, 0, 1,
+		0, 0, 0, 0, 0, 0, 1, 0, 1, 1,
+		0, 0, 0, 0, 0, 1, 0, 1, 0, 1,
+		0, 0, 0, 0, 0, 1, 1, 1, 1, 1,
 	}
 	adjacency := mat.NewDense(Size, Size, data)
 	var eig mat.Eigen
@@ -56,4 +63,17 @@ func main() {
 		}
 		fmt.Printf("\n")
 	}
+	fmt.Printf("\n")
+
+	ranks := make([]float64, Size)
+	graph := pagerank.NewGraph64()
+	for i := 0; i < Size; i++ {
+		for j := 0; j < Size; j++ {
+			graph.Link(uint64(i), uint64(j), adjacency.At(i, j))
+		}
+	}
+	graph.Rank(0.85, 0.000001, func(node uint64, rank float64) {
+		ranks[node] = rank
+	})
+	fmt.Println(ranks)
 }
