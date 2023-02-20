@@ -71,22 +71,22 @@ func main() {
 		Node int
 	}
 	merged := make(map[int]bool)
-	for {
-		graph, ranks := pagerank.NewGraph64(), make([]Rank, Size)
-		for i := 0; i < Size; i++ {
-			for j := 0; j < Size; j++ {
-				graph.Link(uint64(i), uint64(j), adjacency.At(i, j))
-			}
+	graph, ranks := pagerank.NewGraph64(), make([]Rank, Size)
+	for i := 0; i < Size; i++ {
+		for j := 0; j < Size; j++ {
+			graph.Link(uint64(i), uint64(j), adjacency.At(i, j))
 		}
-		graph.Rank(0.85, 0.000001, func(node uint64, rank float64) {
-			ranks[node] = Rank{
-				Rank: rank,
-				Node: int(node),
-			}
-		})
-		sort.Slice(ranks, func(i, j int) bool {
-			return ranks[i].Rank > ranks[j].Rank
-		})
+	}
+	graph.Rank(0.85, 0.000001, func(node uint64, rank float64) {
+		ranks[node] = Rank{
+			Rank: rank,
+			Node: int(node),
+		}
+	})
+	sort.Slice(ranks, func(i, j int) bool {
+		return ranks[i].Rank > ranks[j].Rank
+	})
+	for {
 		a, b, found := -1, -1, 0
 		for i := 0; i < Size; i++ {
 			if !merged[ranks[i].Node] {
