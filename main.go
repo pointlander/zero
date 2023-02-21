@@ -197,6 +197,7 @@ func main() {
 
 	iterations := 128
 	points := make(plotter.XYs, 0, iterations)
+	phase := make(plotter.XYs, 0, iterations)
 	alpha, eta := complex(.3, 0), complex(.3, 0)
 	for i := 0; i < iterations; i++ {
 		set.Zero()
@@ -221,6 +222,7 @@ func main() {
 		}
 
 		points = append(points, plotter.XY{X: float64(i), Y: float64(cmplx.Abs(total))})
+		phase = append(phase, plotter.XY{X: float64(i), Y: float64(cmplx.Phase(total))})
 		fmt.Println(i, cmplx.Abs(total))
 	}
 
@@ -231,6 +233,14 @@ func main() {
 	p.Y.Label.Text = "cost"
 
 	scatter, err := plotter.NewScatter(points)
+	if err != nil {
+		panic(err)
+	}
+	scatter.GlyphStyle.Radius = vg.Length(1)
+	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+	p.Add(scatter)
+
+	scatter, err = plotter.NewScatter(phase)
 	if err != nil {
 		panic(err)
 	}
