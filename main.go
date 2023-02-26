@@ -5,6 +5,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/cmplx"
 	"math/rand"
@@ -55,9 +56,8 @@ func SphericalSoftmax(k tc128.Continuation, node int, a *tc128.V, options ...map
 	return false
 }
 
-func main() {
-	rand.Seed(1)
-
+// Uses page rank to do zero shot learning
+func Rank() {
 	data := []float64{
 		0, 1, 0, 1, 1, 0, 0, 0, 0, 0,
 		1, 0, 1, 0, 1, 0, 0, 0, 0, 0,
@@ -159,8 +159,11 @@ func main() {
 		fmt.Printf("\n")
 	}
 	fmt.Printf("\n")
+}
 
-	data = []float64{
+// Neural uses neural network to do zero shot learning
+func Neural() {
+	data := []float64{
 		0, 1, 0, 1, 1, 0, 0, 0, 0, 0,
 		1, 0, 1, 0, 1, 0, 0, 0, 0, 0,
 		0, 1, 0, 1, 1, 0, 0, 0, 0, 0,
@@ -272,5 +275,25 @@ func main() {
 	fmt.Printf("\n")
 	for _, result := range results {
 		fmt.Printf("%d %f %f\n", result.Index, cmplx.Abs(result.Value), cmplx.Phase(result.Value))
+	}
+}
+
+var (
+	// FlagRank runs the program in page rank mode
+	FlagRank = flag.Bool("rank", false, "page rank mode")
+	// FlagNeural runs the program in neural mode
+	FlagNeural = flag.Bool("neural", false, "neural mode")
+)
+
+func main() {
+	rand.Seed(1)
+	flag.Parse()
+
+	if *FlagRank {
+		Rank()
+		return
+	} else if *FlagNeural {
+		Neural()
+		return
 	}
 }
