@@ -44,6 +44,12 @@ const (
 	Eta = .001
 	// Epochs is the number of epochs
 	Epochs = 512
+	// Width is the width of the model
+	Width = 300
+	// Length is the length of the model
+	Length = 32
+	// Offset is the offset for the parameters to learn
+	Offset = Width * Length / 2
 )
 
 const (
@@ -446,18 +452,18 @@ func main() {
 			panic(err)
 		}
 	}
-	fmt.Println(len(vectors) / 300)
+	fmt.Println(len(vectors) / Width)
 
 	rnd := rand.New(rand.NewSource(1))
 	set := tf32.NewSet()
-	set.Add("words", 300, 32)
+	set.Add("words", Width, Length)
 	for _, w := range set.Weights {
 		factor := math.Sqrt(2.0 / float64(w.S[0]))
 		size := cap(w.X)
 		for _, value := range vectors {
 			w.X = append(w.X, float32(value))
 		}
-		for i := 16 * 300; i < size; i++ {
+		for i := Offset; i < size; i++ {
 			w.X = append(w.X, float32(rnd.NormFloat64()*factor))
 		}
 		w.States = make([][]float32, StateTotal)
@@ -469,7 +475,7 @@ func main() {
 	l1 := tf32.Softmax(tf32.Mul(set.Get("words"), set.Get("words")))
 	l2 := tf32.Softmax(tf32.Mul(tf32.T(set.Get("words")), l1))
 	cost := tf32.Avg(tf32.Entropy(l2))
-	fmt.Println(set.ByName["words"].S)
+
 	i := 1
 	pow := func(x float32) float32 {
 		y := math.Pow(float64(x), float64(i))
@@ -488,8 +494,8 @@ func main() {
 		// Update the point weights with the partial derivatives using adam
 		b1, b2 := pow(B1), pow(B2)
 		for j, w := range set.Weights {
-			for k, d := range w.D[16*300:] {
-				k += 16 * 300
+			for k, d := range w.D[Offset:] {
+				k += Offset
 				g := d
 				m := B1*w.States[StateM][k] + (1-B1)*g
 				v := B2*w.States[StateV][k] + (1-B2)*g*g
