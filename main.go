@@ -5,11 +5,18 @@
 package main
 
 import (
+	"bufio"
+	"compress/gzip"
 	"flag"
 	"fmt"
+	"io"
+	"math"
 	"math/cmplx"
 	"math/rand"
+	"os"
 	"sort"
+	"strconv"
+	"strings"
 
 	"gonum.org/v1/gonum/mat"
 	"gonum.org/v1/plot"
@@ -278,6 +285,72 @@ func Neural() {
 	}
 }
 
+// Vector is a word vector
+type Vector struct {
+	Word   string
+	Vector []float64
+}
+
+// Vectors is a set of word vectors
+type Vectors struct {
+	List       []Vector
+	Dictionary map[string]Vector
+}
+
+// NewVectors creates a new word vector set
+func NewVectors(file string) Vectors {
+	vectors := Vectors{
+		Dictionary: make(map[string]Vector),
+	}
+	in, err := os.Open(file)
+	if err != nil {
+		panic(err)
+	}
+	defer in.Close()
+
+	gzipReader, err := gzip.NewReader(in)
+	if err != nil {
+		panic(err)
+	}
+	reader := bufio.NewReader(gzipReader)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+		}
+		parts := strings.Split(line, " ")
+		values := make([]float64, 0, len(parts)-1)
+		for _, v := range parts[1:] {
+			n, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+			if err != nil {
+				panic(err)
+			}
+			values = append(values, float64(n))
+		}
+		sum := 0.0
+		for _, v := range values {
+			sum += v * v
+		}
+		length := math.Sqrt(sum)
+		for i, v := range values {
+			values[i] = v / length
+		}
+		word := strings.ToLower(strings.TrimSpace(parts[0]))
+		vector := Vector{
+			Word:   word,
+			Vector: values,
+		}
+		vectors.List = append(vectors.List, vector)
+		vectors.Dictionary[word] = vector
+		if len(vector.Vector) == 0 {
+			fmt.Println(vector)
+		}
+	}
+	return vectors
+}
+
 var (
 	// FlagRank runs the program in page rank mode
 	FlagRank = flag.Bool("rank", false, "page rank mode")
@@ -296,4 +369,9 @@ func main() {
 		Neural()
 		return
 	}
+
+	english := NewVectors("cc.en.300.vec.gz")
+	_ = english
+	german := NewVectors("cc.de.300.vec.gz")
+	_ = german
 }
