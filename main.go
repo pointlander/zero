@@ -483,7 +483,8 @@ func main() {
 		}
 	}
 
-	l1 := tf32.Softmax(tf32.Mul(set.Get("words"), set.Get("words")))
+	a := tf32.Mul(set.Get("words"), set.Get("words"))
+	l1 := tf32.Softmax(a)
 	l2 := tf32.Softmax(tf32.Mul(tf32.T(set.Get("words")), l1))
 	cost := tf32.Avg(tf32.Entropy(l2))
 
@@ -552,13 +553,40 @@ func main() {
 		panic(err)
 	}
 
-	l1(func(a *tf32.V) bool {
+	output, err := os.Create("output.html")
+	if err != nil {
+		panic(err)
+	}
+	defer output.Close()
+	a(func(a *tf32.V) bool {
+		fmt.Fprintf(output, "<html>")
+		fmt.Fprintf(output, "<head><title>Adjacency Matrix</title></head>")
+		fmt.Fprintf(output, "<body>")
+		fmt.Fprintf(output, `<style>
+ table, th, td {
+  border: 1px solid black;
+  border-collapse: collapse;
+ }
+</style>
+`)
+		fmt.Fprintf(output, "<table>\n")
+		fmt.Fprintf(output, "<tr>\n")
+		fmt.Fprintf(output, " <th></th>\n")
 		for i := 0; i < Length; i++ {
-			for j := 0; j < Length; j++ {
-				fmt.Printf(" %.7f", a.X[i*Length+j])
-			}
-			fmt.Printf("\n")
+			fmt.Fprintf(output, " <th>%d</th>\n", i)
 		}
+		fmt.Fprintf(output, "</tr>\n")
+		for i := 0; i < Length; i++ {
+			fmt.Fprintf(output, "<tr>\n")
+			fmt.Fprintf(output, " <th>%d</th>\n", i)
+			for j := 0; j < Length; j++ {
+				fmt.Fprintf(output, " <td>%.7f</td>", a.X[i*Length+j])
+			}
+			fmt.Fprintf(output, "</tr>\n")
+		}
+		fmt.Fprintf(output, "</table>")
+		fmt.Fprintf(output, "</body>")
+		fmt.Fprintf(output, "</html>")
 		return true
 	})
 }
