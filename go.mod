@@ -12,6 +12,7 @@ require (
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/pointlander/gradient v0.0.0-20230114050126-69977707af34 // indirect
 	github.com/pointlander/pagerank v0.0.0-20210619221740-830548a59275 // indirect
+	github.com/ziutek/blas v0.0.0-20190227122918-da4ca23e90bb // indirect
 	golang.org/x/image v0.0.0-20220902085622-e7cb96979f69 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gonum.org/v1/gonum v0.12.0 // indirect
