@@ -452,6 +452,17 @@ func main() {
 			panic(err)
 		}
 	}
+	for i := 0; i < Length/2; i++ {
+		sum := 0.0
+		for j := 0; j < Width; j++ {
+			a := vectors[i*Width+j]
+			sum += a * a
+		}
+		length := math.Sqrt(sum)
+		for j := 0; j < Width; j++ {
+			vectors[i*Width+j] /= length
+		}
+	}
 	fmt.Println(len(vectors) / Width)
 
 	rnd := rand.New(rand.NewSource(1))
@@ -540,4 +551,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	l1(func(a *tf32.V) bool {
+		for i := 0; i < Length; i++ {
+			for j := 0; j < Length; j++ {
+				fmt.Printf(" %.7f", a.X[i*Length+j])
+			}
+			fmt.Printf("\n")
+		}
+		return true
+	})
 }
