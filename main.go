@@ -7,6 +7,7 @@ package main
 import (
 	"bufio"
 	"compress/gzip"
+	"encoding/gob"
 	"flag"
 	"fmt"
 	"io"
@@ -391,36 +392,59 @@ func main() {
 		return
 	}
 
-	english := NewVectors("cc.en.300.vec.gz")
-	german := NewVectors("cc.de.300.vec.gz")
-	wordsEnglish := []string{
-		"dog",
-		"cat",
-		"bird",
-		"horse",
-		"chicken",
-		"lamb",
-		"pig",
-		"cow",
-	}
-	wordsGerman := []string{
-		"hund",
-		"katze",
-		"vogel",
-		"pferd",
-		"huhn",
-		"lamm",
-		"schwein",
-		"kuh",
-	}
 	vectors := []float64{}
-	for _, word := range wordsEnglish {
-		vector := english.Dictionary[word]
-		vectors = append(vectors, vector.Vector...)
-	}
-	for _, word := range wordsGerman {
-		vector := german.Dictionary[word]
-		vectors = append(vectors, vector.Vector...)
+	_, err := os.Stat("vectors.gob")
+	if err != nil {
+		english := NewVectors("cc.en.300.vec.gz")
+		german := NewVectors("cc.de.300.vec.gz")
+		wordsEnglish := []string{
+			"dog",
+			"cat",
+			"bird",
+			"horse",
+			"chicken",
+			"lamb",
+			"pig",
+			"cow",
+		}
+		wordsGerman := []string{
+			"hund",
+			"katze",
+			"vogel",
+			"pferd",
+			"huhn",
+			"lamm",
+			"schwein",
+			"kuh",
+		}
+
+		for _, word := range wordsEnglish {
+			vector := english.Dictionary[word]
+			vectors = append(vectors, vector.Vector...)
+		}
+		for _, word := range wordsGerman {
+			vector := german.Dictionary[word]
+			vectors = append(vectors, vector.Vector...)
+		}
+		output, err := os.Create("vectors.gob")
+		if err != nil {
+			panic(err)
+		}
+		encoder := gob.NewEncoder(output)
+		err = encoder.Encode(vectors)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		input, err := os.Open("vectors.gob")
+		if err != nil {
+			panic(err)
+		}
+		decoder := gob.NewDecoder(input)
+		err = decoder.Decode(&vectors)
+		if err != nil {
+			panic(err)
+		}
 	}
 	fmt.Println(len(vectors) / 300)
 
