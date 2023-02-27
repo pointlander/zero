@@ -371,7 +371,35 @@ func main() {
 	}
 
 	english := NewVectors("cc.en.300.vec.gz")
-	_ = english
 	german := NewVectors("cc.de.300.vec.gz")
-	_ = german
+	wordsEnglish := []string{
+		"dog",
+		"cat",
+		"bird",
+		"horse",
+		"chicken",
+		"lamb",
+		"pig",
+		"cow",
+	}
+	wordsGerman := []string{
+		"hund",
+		"katze",
+		"vogel",
+		"pferd",
+		"huhn",
+		"lamm",
+		"schwein",
+		"kuh",
+	}
+	vectors := []float64{}
+	for _, word := range wordsEnglish {
+		vector := english.Dictionary[word]
+		vectors = append(vectors, vector.Vector...)
+	}
+	for _, word := range wordsGerman {
+		vector := german.Dictionary[word]
+		vectors = append(vectors, vector.Vector...)
+	}
+	fmt.Println(len(vectors) / 300)
 }
