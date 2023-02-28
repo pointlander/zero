@@ -47,7 +47,7 @@ const (
 	// Width is the width of the model
 	Width = 300
 	// Length is the length of the model
-	Length = 32
+	Length = 64
 	// Offset is the offset for the parameters to learn
 	Offset = Width * Length / 2
 )
@@ -437,6 +437,16 @@ func main() {
 		"lamb",
 		"pig",
 		"cow",
+
+		"spoon",
+		"fork",
+		"cup",
+		"plate",
+
+		"car",
+		"bus",
+		"scooter",
+		"bike",
 	}
 	wordsGerman := []string{
 		"hund",
@@ -447,6 +457,16 @@ func main() {
 		"lamm",
 		"schwein",
 		"kuh",
+
+		"löffel",
+		"gabel",
+		"tasse",
+		"platte",
+
+		"auto",
+		"bus",
+		"roller",
+		"fahrrad",
 	}
 	words := make([]string, 0, len(wordsEnglish)+len(wordsGerman))
 	words = append(words, wordsEnglish...)
@@ -517,7 +537,8 @@ func main() {
 	//spherical := tf32.U(SphericalSoftmaxReal)
 	a := tf32.Mul(set.Get("words"), set.Get("words"))
 	l1 := tf32.Softmax(a)
-	l2 := tf32.Softmax(tf32.Mul(tf32.T(set.Get("words")), l1))
+	aa := tf32.Mul(tf32.T(set.Get("words")), l1)
+	l2 := tf32.Softmax(aa)
 	b := tf32.Entropy(l2)
 	cost := tf32.Avg(b)
 
@@ -602,8 +623,8 @@ func main() {
 	graphsA := make([]Graph, 0, 8)
 	graphsB := make([]Graph, 0, 8)
 	a(func(a *tf32.V) bool {
-		for i := 16; i < Length; i++ {
-			for j := 16; j < Length; j++ {
+		for i := Length / 2; i < Length; i++ {
+			for j := Length / 2; j < Length; j++ {
 				value := a.X[i*Length+j]
 				graphs = append(graphs, Graph{
 					Value:  value,
@@ -616,7 +637,7 @@ func main() {
 			return graphs[i].Value > graphs[j].Value
 		})
 
-		for i := 16; i < Length; i++ {
+		for i := Length / 2; i < Length; i++ {
 			for j := 0; j < Length/2; j++ {
 				value := a.X[i*Length+j]
 				graphsA = append(graphsA, Graph{
@@ -631,7 +652,7 @@ func main() {
 		})
 
 		for i := 0; i < Length/2; i++ {
-			for j := 16; j < Length; j++ {
+			for j := Length / 2; j < Length; j++ {
 				value := a.X[i*Length+j]
 				graphsB = append(graphsB, Graph{
 					Value:  value,
@@ -699,10 +720,40 @@ func main() {
 		return e[i].Entropy > e[j].Entropy
 	})
 	for _, entropy := range e {
-		if entropy.Index < 16 {
+		if entropy.Index < Length/2 {
 			fmt.Println(words[entropy.Index], entropy.Entropy)
 		} else {
-			fmt.Println("+", words[entropy.Index-16], entropy.Entropy)
+			fmt.Println("+", words[entropy.Index-Length/2], entropy.Entropy)
 		}
+	}
+
+	type Rank struct {
+		Index int
+		Rank  float32
+	}
+	ranks := make([]Rank, 0, 8)
+	aa(func(a *tf32.V) bool {
+		for i := 0; i < Length; i++ {
+			sum := float32(0)
+			aa := float32(0)
+			bb := float32(0)
+			for j := 0; j < Width; j++ {
+				a, b := a.X[j], a.X[i*Width+j]
+				aa += a * a
+				bb += b * b
+				sum += a * b
+			}
+			ranks = append(ranks, Rank{
+				Index: i,
+				Rank:  sum / (float32(math.Sqrt(float64(aa)) * math.Sqrt(float64(bb)))),
+			})
+		}
+		return true
+	})
+	sort.Slice(ranks, func(i, j int) bool {
+		return ranks[i].Rank > ranks[j].Rank
+	})
+	for _, rank := range ranks {
+		fmt.Println(rank)
 	}
 }
