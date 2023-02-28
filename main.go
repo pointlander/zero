@@ -428,29 +428,32 @@ func main() {
 
 	vectors := []float64{}
 	_, err := os.Stat("vectors.gob")
+	wordsEnglish := []string{
+		"dog",
+		"cat",
+		"bird",
+		"horse",
+		"chicken",
+		"lamb",
+		"pig",
+		"cow",
+	}
+	wordsGerman := []string{
+		"hund",
+		"katze",
+		"vogel",
+		"pferd",
+		"huhn",
+		"lamm",
+		"schwein",
+		"kuh",
+	}
+	words := make([]string, 0, len(wordsEnglish)+len(wordsGerman))
+	words = append(words, wordsEnglish...)
+	words = append(words, wordsGerman...)
 	if err != nil {
 		english := NewVectors("cc.en.300.vec.gz")
 		german := NewVectors("cc.de.300.vec.gz")
-		wordsEnglish := []string{
-			"dog",
-			"cat",
-			"bird",
-			"horse",
-			"chicken",
-			"lamb",
-			"pig",
-			"cow",
-		}
-		wordsGerman := []string{
-			"hund",
-			"katze",
-			"vogel",
-			"pferd",
-			"huhn",
-			"lamm",
-			"schwein",
-			"kuh",
-		}
 
 		for _, word := range wordsEnglish {
 			vector := english.Dictionary[word]
@@ -515,7 +518,8 @@ func main() {
 	a := tf32.Mul(set.Get("words"), set.Get("words"))
 	l1 := tf32.Softmax(a)
 	l2 := tf32.Softmax(tf32.Mul(tf32.T(set.Get("words")), l1))
-	cost := tf32.Avg(tf32.Entropy(l2))
+	b := tf32.Entropy(l2)
+	cost := tf32.Avg(b)
 
 	i := 1
 	pow := func(x float32) float32 {
@@ -676,4 +680,29 @@ func main() {
 		fmt.Fprintf(output, "</html>")
 		return true
 	})
+
+	type Entropy struct {
+		Index   int
+		Entropy float32
+	}
+	e := make([]Entropy, 0, 8)
+	b(func(a *tf32.V) bool {
+		for key, value := range a.X {
+			e = append(e, Entropy{
+				Index:   key,
+				Entropy: value,
+			})
+		}
+		return true
+	})
+	sort.Slice(e, func(i, j int) bool {
+		return e[i].Entropy > e[j].Entropy
+	})
+	for _, entropy := range e {
+		if entropy.Index < 16 {
+			fmt.Println(words[entropy.Index], entropy.Entropy)
+		} else {
+			fmt.Println("+", words[entropy.Index-16], entropy.Entropy)
+		}
+	}
 }
