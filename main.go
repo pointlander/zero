@@ -91,6 +91,34 @@ func SphericalSoftmax(k tc128.Continuation, node int, a *tc128.V, options ...map
 	return false
 }
 
+func SphericalSoftmaxReal(k tf32.Continuation, node int, a *tf32.V, options ...map[string]interface{}) bool {
+	const E = 0
+	c, size, width := tf32.NewV(a.S...), len(a.X), a.S[0]
+	values, sums, row := make([]float32, width), make([]float32, a.S[1]), 0
+	for i := 0; i < size; i += width {
+		sum := float32(0)
+		for j, ax := range a.X[i : i+width] {
+			values[j] = ax*ax + E
+			sum += values[j]
+		}
+		for _, cx := range values {
+			c.X = append(c.X, (cx+E)/sum)
+		}
+		sums[row] = sum
+		row++
+	}
+	if k(&c) {
+		return true
+	}
+	// (2 a (b^2 + c^2 + d^2 + 0.003))/(a^2 + b^2 + c^2 + d^2 + 0.004)^2
+	for i, d := range c.D {
+		ax, sum := a.X[i], sums[i/width]
+		//a.D[i] += d*(2*ax*(sum-(ax*ax+E)))/(sum*sum) - d*cx*2*ax/sum
+		a.D[i] += d * (2 * ax * (sum - (ax*ax + E))) / (sum * sum)
+	}
+	return false
+}
+
 // Uses page rank to do zero shot learning
 func Rank() {
 	data := []float64{
@@ -483,6 +511,7 @@ func main() {
 		}
 	}
 
+	//spherical := tf32.U(SphericalSoftmaxReal)
 	a := tf32.Mul(set.Get("words"), set.Get("words"))
 	l1 := tf32.Softmax(a)
 	l2 := tf32.Softmax(tf32.Mul(tf32.T(set.Get("words")), l1))
@@ -558,7 +587,65 @@ func main() {
 		panic(err)
 	}
 	defer output.Close()
+
+	type Graph struct {
+		Value  float32
+		Row    int
+		Column int
+	}
+
+	graphs := make([]Graph, 0, 8)
+	graphsA := make([]Graph, 0, 8)
+	graphsB := make([]Graph, 0, 8)
 	a(func(a *tf32.V) bool {
+		for i := 16; i < Length; i++ {
+			for j := 16; j < Length; j++ {
+				value := a.X[i*Length+j]
+				graphs = append(graphs, Graph{
+					Value:  value,
+					Row:    i,
+					Column: j,
+				})
+			}
+		}
+		sort.Slice(graphs, func(i, j int) bool {
+			return graphs[i].Value > graphs[j].Value
+		})
+
+		for i := 16; i < Length; i++ {
+			for j := 0; j < Length/2; j++ {
+				value := a.X[i*Length+j]
+				graphsA = append(graphsA, Graph{
+					Value:  value,
+					Row:    i,
+					Column: j,
+				})
+			}
+		}
+		sort.Slice(graphsA, func(i, j int) bool {
+			return graphsA[i].Value > graphsA[j].Value
+		})
+
+		for i := 0; i < Length/2; i++ {
+			for j := 16; j < Length; j++ {
+				value := a.X[i*Length+j]
+				graphsB = append(graphsB, Graph{
+					Value:  value,
+					Row:    i,
+					Column: j,
+				})
+			}
+		}
+		sort.Slice(graphsB, func(i, j int) bool {
+			return graphsB[i].Value > graphsB[j].Value
+		})
+		for i, graph := range graphs {
+			fmt.Printf("% 7.7f %2d %2d % 7.7f %2d %2d % 7.7f %2d %2d\n",
+				graph.Value, graph.Row, graph.Column,
+				graphsA[i].Value, graphsA[i].Row, graphsA[i].Column,
+				graphsB[i].Value, graphsB[i].Row, graphsB[i].Column)
+		}
+
 		fmt.Fprintf(output, "<html>")
 		fmt.Fprintf(output, "<head><title>Adjacency Matrix</title></head>")
 		fmt.Fprintf(output, "<body>")
