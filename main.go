@@ -468,6 +468,12 @@ func main() {
 		"roller",
 		"fahrrad",
 	}
+	dictionary := make(map[string]string)
+	for i, english := range wordsEnglish {
+		german := wordsGerman[i]
+		dictionary[english] = german
+		dictionary[german] = english
+	}
 	words := make([]string, 0, len(wordsEnglish)+len(wordsGerman))
 	words = append(words, wordsEnglish...)
 	words = append(words, wordsGerman...)
@@ -706,25 +712,35 @@ func main() {
 		Index   int
 		Entropy float32
 	}
-	e := make([]Entropy, 0, 8)
+	x, y := make([]Entropy, 0, 8), make([]Entropy, 0, 8)
 	b(func(a *tf32.V) bool {
 		for key, value := range a.X {
-			e = append(e, Entropy{
-				Index:   key,
-				Entropy: value,
-			})
+			if key < Length/2 {
+				x = append(x, Entropy{
+					Index:   key,
+					Entropy: value,
+				})
+			} else {
+				y = append(y, Entropy{
+					Index:   key - Length/2,
+					Entropy: value,
+				})
+			}
 		}
 		return true
 	})
-	sort.Slice(e, func(i, j int) bool {
-		return e[i].Entropy > e[j].Entropy
+	sort.Slice(x, func(i, j int) bool {
+		return x[i].Entropy > x[j].Entropy
 	})
-	for _, entropy := range e {
-		if entropy.Index < Length/2 {
-			fmt.Println(words[entropy.Index], entropy.Entropy)
-		} else {
-			fmt.Println("+", words[entropy.Index-Length/2], entropy.Entropy)
-		}
+	sort.Slice(y, func(i, j int) bool {
+		return y[i].Entropy > y[j].Entropy
+	})
+	for _, entropy := range x {
+		fmt.Println(words[entropy.Index], entropy.Entropy)
+	}
+	fmt.Println()
+	for _, entropy := range y {
+		fmt.Println(words[entropy.Index], entropy.Entropy)
 	}
 
 	type Rank struct {
@@ -756,4 +772,28 @@ func main() {
 	for _, rank := range ranks {
 		fmt.Println(rank)
 	}
+
+	correctnessX := 0
+	for i := 0; i < Length/2; i++ {
+		start := words[x[i].Index]
+		target := dictionary[start]
+		for j := i + 1; j < Length/2; j++ {
+			if words[x[j].Index] == target {
+				correctnessX += j - i
+			}
+		}
+	}
+	fmt.Println("x", correctnessX)
+
+	correctnessY := 0
+	for i := 0; i < Length/2; i++ {
+		start := words[y[i].Index]
+		target := dictionary[start]
+		for j := i + 1; j < Length/2; j++ {
+			if words[y[j].Index] == target {
+				correctnessY += j - i
+			}
+		}
+	}
+	fmt.Println("y", correctnessY)
 }
