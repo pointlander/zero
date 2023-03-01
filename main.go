@@ -43,7 +43,7 @@ const (
 	// Eta is the learning rate
 	Eta = .001
 	// Epochs is the number of epochs
-	Epochs = 512
+	Epochs = 256
 	// Width is the width of the model
 	Width = 300
 	// Length is the length of the model
@@ -584,6 +584,7 @@ func main() {
 	rnd := rand.New(rand.NewSource(1))
 	set := tf32.NewSet()
 	set.Add("words", Width, Length)
+	w := set.ByName["words"]
 	for _, w := range set.Weights {
 		factor := math.Sqrt(2.0 / float64(w.S[0]))
 		size := cap(w.X)
@@ -598,9 +599,16 @@ func main() {
 			w.States[i] = make([]float32, len(w.X))
 		}
 	}
+	set.Add("inputs", Width, Length)
+	inputs := set.ByName["inputs"]
+	inputs.X = append(inputs.X, w.X...)
+	inputs.States = make([][]float32, StateTotal)
+	for i := range inputs.States {
+		inputs.States[i] = make([]float32, len(inputs.X))
+	}
 
 	//spherical := tf32.U(SphericalSoftmaxReal)
-	a := tf32.Mul(set.Get("words"), set.Get("words"))
+	a := tf32.Mul(set.Get("words"), set.Get("inputs"))
 	l1 := tf32.Softmax(a)
 	aa := tf32.Mul(tf32.T(set.Get("words")), l1)
 	l2 := tf32.Softmax(aa)
@@ -624,19 +632,30 @@ func main() {
 
 		// Update the point weights with the partial derivatives using adam
 		b1, b2 := pow(B1), pow(B2)
-		for j, w := range set.Weights {
-			for k, d := range w.D[Offset:] {
-				k += Offset
-				g := d
-				m := B1*w.States[StateM][k] + (1-B1)*g
-				v := B2*w.States[StateV][k] + (1-B2)*g*g
-				w.States[StateM][k] = m
-				w.States[StateV][k] = v
-				mhat := m / (1 - b1)
-				vhat := v / (1 - b2)
-				set.Weights[j].X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
-			}
+
+		for k, d := range w.D[Offset:] {
+			k += Offset
+			g := d
+			m := B1*w.States[StateM][k] + (1-B1)*g
+			v := B2*w.States[StateV][k] + (1-B2)*g*g
+			w.States[StateM][k] = m
+			w.States[StateV][k] = v
+			mhat := m / (1 - b1)
+			vhat := v / (1 - b2)
+			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
 		}
+		for k, d := range inputs.D[Offset:] {
+			k += Offset
+			g := d
+			m := B1*inputs.States[StateM][k] + (1-B1)*g
+			v := B2*inputs.States[StateV][k] + (1-B2)*g*g
+			inputs.States[StateM][k] = m
+			inputs.States[StateV][k] = v
+			mhat := m / (1 - b1)
+			vhat := v / (1 - b2)
+			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
+		}
+		copy(inputs.X, w.X)
 
 		// Housekeeping
 		end := time.Since(start)
