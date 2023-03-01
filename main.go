@@ -687,7 +687,7 @@ func main() {
 	graphs := make([]Graph, 0, 8)
 	graphsA := make([]Graph, 0, 8)
 	graphsB := make([]Graph, 0, 8)
-	a(func(a *tf32.V) bool {
+	l1(func(a *tf32.V) bool {
 		for i := Length / 2; i < Length; i++ {
 			for j := Length / 2; j < Length; j++ {
 				value := a.X[i*Length+j]
@@ -701,6 +701,39 @@ func main() {
 		sort.Slice(graphs, func(i, j int) bool {
 			return graphs[i].Value > graphs[j].Value
 		})
+
+		first, second := graphs[0].Column, 0
+		for _, graph := range graphs[1:] {
+			if graph.Column != first {
+				second = graph.Column
+				break
+			}
+		}
+
+		pairs := make(plotter.XYs, 0, 8)
+		for i := Length / 2; i < Length; i++ {
+			x, y := a.X[i*Length+first], a.X[i*Length+second]
+			pairs = append(pairs, plotter.XY{X: float64(x), Y: float64(y)})
+		}
+		// Plot the cost
+		p := plot.New()
+
+		p.Title.Text = "x vs y"
+		p.X.Label.Text = fmt.Sprintf("x %d", first)
+		p.Y.Label.Text = fmt.Sprintf("y %d", second)
+
+		scatter, err := plotter.NewScatter(pairs)
+		if err != nil {
+			panic(err)
+		}
+		scatter.GlyphStyle.Radius = vg.Length(1)
+		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+		p.Add(scatter)
+
+		err = p.Save(8*vg.Inch, 8*vg.Inch, "pairs.png")
+		if err != nil {
+			panic(err)
+		}
 
 		for i := Length / 2; i < Length; i++ {
 			for j := 0; j < Length/2; j++ {
