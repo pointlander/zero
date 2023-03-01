@@ -47,9 +47,20 @@ const (
 	// Width is the width of the model
 	Width = 300
 	// Length is the length of the model
-	Length = 64
+	// 128
+	// x 12.5
+	// y 9.875
+	// 64
+	// x 6.8125
+	// y 3.625
+	// 32
+	// x 3.375
+	// y 3.5
+	Length = 128
 	// Offset is the offset for the parameters to learn
 	Offset = Width * Length / 2
+	// Words is the number of words per language
+	Words = Length / 4
 )
 
 const (
@@ -433,6 +444,7 @@ func main() {
 		"cat",
 		"bird",
 		"horse",
+
 		"chicken",
 		"lamb",
 		"pig",
@@ -447,12 +459,33 @@ func main() {
 		"bus",
 		"scooter",
 		"bike",
+
+		"house",
+		"door",
+		"window",
+		"floor",
+
+		"shovel",
+		"hoe",
+		"plow",
+		"axe",
+
+		"pen",
+		"pencil",
+		"brush",
+		"crayon",
+
+		"chair",
+		"bed",
+		"table",
+		"dresser",
 	}
 	wordsGerman := []string{
 		"hund",
 		"katze",
 		"vogel",
 		"pferd",
+
 		"huhn",
 		"lamm",
 		"schwein",
@@ -467,26 +500,52 @@ func main() {
 		"bus",
 		"roller",
 		"fahrrad",
+
+		"haus",
+		"tür",
+		"fenster",
+		"boden",
+
+		"schaufel",
+		"hacke",
+		"pflug",
+		"axt",
+
+		"stift",
+		"bleistift",
+		"bürste",
+		"wachsmalstift",
+
+		"stuhl",
+		"bett",
+		"tisch",
+		"kommode",
 	}
 	dictionary := make(map[string]string)
-	for i, english := range wordsEnglish {
+	for i, english := range wordsEnglish[:Words] {
 		german := wordsGerman[i]
 		dictionary[english] = german
 		dictionary[german] = english
 	}
 	words := make([]string, 0, len(wordsEnglish)+len(wordsGerman))
-	words = append(words, wordsEnglish...)
-	words = append(words, wordsGerman...)
+	words = append(words, wordsEnglish[:Words]...)
+	words = append(words, wordsGerman[:Words]...)
 	if err != nil {
 		english := NewVectors("cc.en.300.vec.gz")
 		german := NewVectors("cc.de.300.vec.gz")
 
-		for _, word := range wordsEnglish {
+		for _, word := range wordsEnglish[:Words] {
 			vector := english.Dictionary[word]
+			if len(vector.Vector) == 0 {
+				panic(word)
+			}
 			vectors = append(vectors, vector.Vector...)
 		}
-		for _, word := range wordsGerman {
+		for _, word := range wordsGerman[:Words] {
 			vector := german.Dictionary[word]
+			if len(vector.Vector) == 0 {
+				panic(word)
+			}
 			vectors = append(vectors, vector.Vector...)
 		}
 		output, err := os.Create("vectors.gob")
@@ -736,11 +795,13 @@ func main() {
 		return y[i].Entropy > y[j].Entropy
 	})
 	for _, entropy := range x {
-		fmt.Println(words[entropy.Index], entropy.Entropy)
+		word := words[entropy.Index]
+		fmt.Println(word, dictionary[word], entropy.Entropy)
 	}
 	fmt.Println()
 	for _, entropy := range y {
-		fmt.Println(words[entropy.Index], entropy.Entropy)
+		word := words[entropy.Index]
+		fmt.Println(word, dictionary[word], entropy.Entropy)
 	}
 
 	type Rank struct {
@@ -783,7 +844,7 @@ func main() {
 			}
 		}
 	}
-	fmt.Println("x", correctnessX)
+	fmt.Println("x", 2*float64(correctnessX)/Length)
 
 	correctnessY := 0
 	for i := 0; i < Length/2; i++ {
@@ -795,5 +856,5 @@ func main() {
 			}
 		}
 	}
-	fmt.Println("y", correctnessY)
+	fmt.Println("y", 2*float64(correctnessY)/Length)
 }
