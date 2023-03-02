@@ -43,7 +43,7 @@ const (
 	// Eta is the learning rate
 	Eta = .001
 	// Epochs is the number of epochs
-	Epochs = 256
+	Epochs = 128
 	// Width is the width of the model
 	Width = 300
 	// Length is the length of the model
@@ -582,6 +582,34 @@ func main() {
 	fmt.Println(len(vectors) / Width)
 
 	rnd := rand.New(rand.NewSource(1))
+	dropout := tf32.U(func(k tf32.Continuation, node int, a *tf32.V, options ...map[string]interface{}) bool {
+		size, width := len(a.X), a.S[0]
+		c, drops, factor := tf32.NewV(a.S...), make([]int, width), float32(1)/(1-.3)
+		for i := range drops {
+			if rnd.Float64() > .3 {
+				drops[i] = 1
+			}
+		}
+		c.X = c.X[:cap(c.X)]
+		for i := 0; i < size; i += width {
+			for j, ax := range a.X[i : i+width] {
+				if drops[j] == 1 {
+					c.X[i+j] = ax * factor
+				}
+			}
+		}
+		if k(&c) {
+			return true
+		}
+		for i := 0; i < size; i += width {
+			for j := range a.D[i : i+width] {
+				if drops[j] == 1 {
+					a.D[i+j] += c.D[i+j]
+				}
+			}
+		}
+		return false
+	})
 	set := tf32.NewSet()
 	set.Add("words", Width, Length)
 	w := set.ByName["words"]
@@ -609,7 +637,7 @@ func main() {
 
 	//spherical := tf32.U(SphericalSoftmaxReal)
 	a := tf32.Mul(set.Get("words"), set.Get("inputs"))
-	l1 := tf32.Softmax(a)
+	l1 := dropout(tf32.Softmax(a))
 	aa := tf32.Mul(tf32.T(set.Get("words")), l1)
 	l2 := tf32.Softmax(aa)
 	b := tf32.Entropy(l2)
@@ -690,6 +718,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	a = tf32.Mul(set.Get("words"), set.Get("inputs"))
+	l1 = tf32.Softmax(a)
+	aa = tf32.Mul(tf32.T(set.Get("words")), l1)
+	l2 = tf32.Softmax(aa)
+	b = tf32.Entropy(l2)
+	cost = tf32.Avg(b)
 
 	output, err := os.Create("output.html")
 	if err != nil {
