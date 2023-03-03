@@ -897,12 +897,12 @@ func main() {
 	}
 	ranks := make([]Rank, 0, 8)
 	aa(func(a *tf32.V) bool {
-		for i := 0; i < Length; i++ {
+		for i := Length / 2; i < Length; i++ {
 			sum := float32(0)
 			aa := float32(0)
 			bb := float32(0)
 			for j := 0; j < Width; j++ {
-				a, b := a.X[j], a.X[i*Width+j]
+				a, b := a.X[(Length/2)*Width+j], a.X[i*Width+j]
 				aa += a * a
 				bb += b * b
 				sum += a * b
@@ -944,4 +944,25 @@ func main() {
 		}
 	}
 	fmt.Println("y", 2*float64(correctnessY)/Length)
+
+	average := 0.0
+	for i := 0; i < 256; i++ {
+		w := make([]string, len(words))
+		copy(w, words)
+		rand.Shuffle(len(words), func(i, j int) {
+			w[i], w[j] = w[j], w[i]
+		})
+		correctness := 0
+		for i := 0; i < Length/2; i++ {
+			start := w[i]
+			target := dictionary[start]
+			for j := i + 1; j < Length/2; j++ {
+				if w[j] == target {
+					correctness += j - i
+				}
+			}
+		}
+		average += 2 * float64(correctness) / Length
+	}
+	fmt.Println("random", average/256)
 }
