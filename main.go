@@ -43,7 +43,7 @@ const (
 	// Eta is the learning rate
 	Eta = .001
 	// Epochs is the number of epochs
-	Epochs = 128
+	Epochs = 256
 	// Width is the width of the model
 	Width = 300
 	// Length is the length of the model
@@ -568,6 +568,15 @@ func main() {
 			panic(err)
 		}
 	}
+	{
+		buffer := make([]float64, Width)
+		rand.Shuffle(Length/2, func(i, j int) {
+			copy(buffer, vectors[i*Width:i*Width+Width])
+			copy(vectors[i*Width:i*Width+Width], vectors[j*Width:j*Width+Width])
+			copy(vectors[j*Width:j*Width+Width], buffer)
+			words[i], words[j] = words[j], words[i]
+		})
+	}
 	for i := 0; i < Length/2; i++ {
 		sum := 0.0
 		for j := 0; j < Width; j++ {
@@ -931,7 +940,7 @@ func main() {
 			}
 		}
 	}
-	fmt.Println("x", 2*float64(correctnessX)/Length)
+	fmt.Println("input", 2*float64(correctnessX)/Length)
 
 	correctnessY := 0
 	for i := 0; i < Length/2; i++ {
@@ -943,9 +952,9 @@ func main() {
 			}
 		}
 	}
-	fmt.Println("y", 2*float64(correctnessY)/Length)
+	fmt.Println("learned", 2*float64(correctnessY)/Length)
 
-	average := 0.0
+	average, squared := 0.0, 0.0
 	for i := 0; i < 256; i++ {
 		w := make([]string, len(words))
 		copy(w, words)
@@ -962,7 +971,12 @@ func main() {
 				}
 			}
 		}
-		average += 2 * float64(correctness) / Length
+		x := 2 * float64(correctness) / Length
+		average += x
+		squared += x * x
 	}
-	fmt.Println("random", average/256)
+	average /= 256
+	squared /= 256
+	stddev := math.Sqrt(squared - average*average)
+	fmt.Println("random", average-3*stddev, average, average+3*stddev)
 }
