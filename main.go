@@ -568,15 +568,6 @@ func main() {
 			panic(err)
 		}
 	}
-	{
-		buffer := make([]float64, Width)
-		rand.Shuffle(Length/2, func(i, j int) {
-			copy(buffer, vectors[i*Width:i*Width+Width])
-			copy(vectors[i*Width:i*Width+Width], vectors[j*Width:j*Width+Width])
-			copy(vectors[j*Width:j*Width+Width], buffer)
-			words[i], words[j] = words[j], words[i]
-		})
-	}
 	for i := 0; i < Length/2; i++ {
 		sum := 0.0
 		for j := 0; j < Width; j++ {
@@ -643,6 +634,20 @@ func main() {
 	for i := range inputs.States {
 		inputs.States[i] = make([]float32, len(inputs.X))
 	}
+
+	order := func() {
+		buffer := make([]float32, Width)
+		rand.Shuffle(Length/2, func(i, j int) {
+			copy(buffer, w.X[i*Width:i*Width+Width])
+			copy(w.X[i*Width:i*Width+Width], w.X[j*Width:j*Width+Width])
+			copy(w.X[j*Width:j*Width+Width], buffer)
+			copy(buffer, inputs.X[i*Width:i*Width+Width])
+			copy(inputs.X[i*Width:i*Width+Width], inputs.X[j*Width:j*Width+Width])
+			copy(inputs.X[j*Width:j*Width+Width], buffer)
+			words[i], words[j] = words[j], words[i]
+		})
+	}
+	order()
 
 	//spherical := tf32.U(SphericalSoftmaxReal)
 	a := tf32.Mul(set.Get("words"), set.Get("inputs"))
