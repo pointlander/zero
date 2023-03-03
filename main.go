@@ -935,29 +935,22 @@ func main() {
 		fmt.Println(rank)
 	}
 
-	correctnessX := 0
-	for i := 0; i < Length/2; i++ {
-		start := words[x[i].Index]
-		target := dictionary[start]
-		for j := i + 1; j < Length/2; j++ {
-			if words[x[j].Index] == target {
-				correctnessX += j - i
+	accuracy := func(x []Entropy) float64 {
+		correctness := 0
+		for i := 0; i < Length/2; i++ {
+			start := words[x[i].Index]
+			target := dictionary[start]
+			for j := i + 1; j < Length/2; j++ {
+				if words[x[j].Index] == target {
+					correctness += j - i
+					break
+				}
 			}
 		}
+		return 2 * float64(correctness) / Length
 	}
-	fmt.Println("input", 2*float64(correctnessX)/Length)
-
-	correctnessY := 0
-	for i := 0; i < Length/2; i++ {
-		start := words[y[i].Index]
-		target := dictionary[start]
-		for j := i + 1; j < Length/2; j++ {
-			if words[y[j].Index] == target {
-				correctnessY += j - i
-			}
-		}
-	}
-	fmt.Println("learned", 2*float64(correctnessY)/Length)
+	fmt.Println("input", accuracy(x))
+	fmt.Println("learned", accuracy(y))
 
 	average, squared := 0.0, 0.0
 	for i := 0; i < 256; i++ {
@@ -973,6 +966,7 @@ func main() {
 			for j := i + 1; j < Length/2; j++ {
 				if w[j] == target {
 					correctness += j - i
+					break
 				}
 			}
 		}
