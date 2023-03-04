@@ -44,7 +44,7 @@ const (
 	// Eta is the learning rate
 	Eta = .001
 	// Epochs is the number of epochs
-	Epochs = 256
+	Epochs = 64
 	// Width is the width of the model
 	Width = 300
 	// Length is the length of the model
@@ -632,9 +632,9 @@ func main() {
 	rnd := rand.New(rand.NewSource(1))
 	dropout := tf32.U(func(k tf32.Continuation, node int, a *tf32.V, options ...map[string]interface{}) bool {
 		size, width := len(a.X), a.S[0]
-		c, drops, factor := tf32.NewV(a.S...), make([]int, width), float32(1)/(1-.3)
+		c, drops, factor := tf32.NewV(a.S...), make([]int, width), float32(1)/(1-.5)
 		for i := range drops {
-			if rnd.Float64() > .3 {
+			if rnd.Float64() > .5 {
 				drops[i] = 1
 			}
 		}
@@ -1026,5 +1026,11 @@ func main() {
 	average /= 256
 	squared /= 256
 	stddev := math.Sqrt(squared - average*average)
-	fmt.Println("random", average-3*stddev, average, average+3*stddev)
+	fmt.Println("-3 std", average-3*stddev)
+	fmt.Println("-2 std", average-2*stddev)
+	fmt.Println("-1 std", average-1*stddev)
+	fmt.Println("avg", average)
+	fmt.Println("+1 std", average+1*stddev)
+	fmt.Println("+2 std", average+2*stddev)
+	fmt.Println("+3 std", average+3*stddev)
 }
