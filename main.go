@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"gonum.org/v1/gonum/mat"
+	"gonum.org/v1/gonum/stat"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
@@ -568,6 +569,7 @@ func main() {
 			panic(err)
 		}
 	}
+
 	for i := 0; i < Length/2; i++ {
 		sum := 0.0
 		for j := 0; j < Width; j++ {
@@ -580,6 +582,52 @@ func main() {
 		}
 	}
 	fmt.Println(len(vectors) / Width)
+
+	type Word struct {
+		Word  string
+		Value float64
+		Index int
+	}
+	project := func(words []string, vectors []float64) []Word {
+		projection := make([]Word, 0, 8)
+		dense := mat.NewDense(Words, Width, vectors)
+		var pc stat.PC
+		ok := pc.PrincipalComponents(dense, nil)
+		if !ok {
+			panic("PrincipalComponents failed")
+		}
+		k := 1
+		var proj mat.Dense
+		var vec mat.Dense
+		pc.VectorsTo(&vec)
+		proj.Mul(dense, vec.Slice(0, Width, 0, k))
+		for i := 0; i < Words; i++ {
+			projection = append(projection, Word{
+				Word:  words[i],
+				Value: proj.At(i, 0),
+				Index: i,
+			})
+		}
+		sort.Slice(projection, func(i, j int) bool {
+			return projection[i].Value < projection[j].Value
+		})
+		return projection
+	}
+	projectionEnglish := project(words[:Words], vectors[:Words*Width])
+	projectionGerman := project(words[Words:], vectors[Words*Width:2*Words*Width])
+	vectorsNew := make([]float64, len(vectors))
+	wordsNew := make([]string, len(words))
+	for i, value := range projectionEnglish {
+		copy(vectorsNew[Width*i:Width*i+Width], vectors[Width*value.Index:Width*value.Index+Width])
+		wordsNew[i] = words[value.Index]
+	}
+	for i, value := range projectionGerman {
+		i += Words
+		value.Index += Words
+		copy(vectorsNew[Width*i:Width*i+Width], vectors[Width*value.Index:Width*value.Index+Width])
+		wordsNew[i] = words[value.Index]
+	}
+	words, vectors = wordsNew, vectorsNew
 
 	rnd := rand.New(rand.NewSource(1))
 	dropout := tf32.U(func(k tf32.Continuation, node int, a *tf32.V, options ...map[string]interface{}) bool {
@@ -647,7 +695,8 @@ func main() {
 			words[i], words[j] = words[j], words[i]
 		})
 	}
-	order()
+	_ = order
+	//order()
 
 	//spherical := tf32.U(SphericalSoftmaxReal)
 	a := tf32.Mul(set.Get("words"), set.Get("inputs"))
