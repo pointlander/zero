@@ -797,7 +797,7 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 			target := dictionary[start]
 			for j := i + 1; j < Length/2; j++ {
 				if words[x[j].Index] == target {
-					correctness += j - i
+					correctness += j - i - 1
 					break
 				}
 			}
@@ -820,7 +820,7 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 			target := dictionary[start]
 			for j := i + 1; j < Length/2; j++ {
 				if w[j] == target {
-					correctness += j - i
+					correctness += j - i - 1
 					break
 				}
 			}
