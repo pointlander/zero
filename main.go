@@ -1047,5 +1047,15 @@ func main() {
 
 	rnd := rand.New(rand.NewSource(1))
 
-	process(rnd, 0, dictionary, words, vectors)
+	for i := 0; i < 3; i++ {
+		_, y := process(rnd, i, dictionary, words, vectors)
+
+		vectorsNew := make([]float64, len(vectors))
+		wordsNew := make([]string, len(words))
+		for i, value := range y {
+			copy(vectorsNew[Width*i:Width*i+Width], vectors[Width*value.Index:Width*value.Index+Width])
+			wordsNew[i] = words[value.Index]
+		}
+		words, vectors = wordsNew, vectorsNew
+	}
 }
