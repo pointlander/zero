@@ -587,7 +587,7 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
 	p.Add(scatter)
 
-	err = p.Save(8*vg.Inch, 8*vg.Inch, "cost.png")
+	err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%d_cost.png", iteration))
 	if err != nil {
 		panic(err)
 	}
@@ -657,7 +657,7 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
 		p.Add(scatter)
 
-		err = p.Save(8*vg.Inch, 8*vg.Inch, "pairs.png")
+		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%d_pairs.png", iteration))
 		if err != nil {
 			panic(err)
 		}
