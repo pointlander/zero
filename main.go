@@ -910,6 +910,35 @@ func GradientDescent(dictionary map[string]string, words []string, vectors []flo
 }
 
 func sample(rnd *rand.Rand, vectors []float64) []Entropy {
+	dropout := tf32.U(func(k tf32.Continuation, node int, a *tf32.V, options ...map[string]interface{}) bool {
+		size, width := len(a.X), a.S[0]
+		c, drops, factor := tf32.NewV(a.S...), make([]int, width), float32(1)/(1-.5)
+		for i := range drops {
+			if rnd.Float64() > .5 {
+				drops[i] = 1
+			}
+		}
+		c.X = c.X[:cap(c.X)]
+		for i := 0; i < size; i += width {
+			for j, ax := range a.X[i : i+width] {
+				if drops[j] == 1 {
+					c.X[i+j] = ax * factor
+				}
+			}
+		}
+		if k(&c) {
+			return true
+		}
+		for i := 0; i < size; i += width {
+			for j := range a.D[i : i+width] {
+				if drops[j] == 1 {
+					a.D[i+j] += c.D[i+j]
+				}
+			}
+		}
+		return false
+	})
+
 	set := tf32.NewSet()
 	set.Add("words", Width, Length)
 	w := set.ByName["words"]
@@ -922,14 +951,78 @@ func sample(rnd *rand.Rand, vectors []float64) []Entropy {
 		for i := Offset; i < size; i++ {
 			w.X = append(w.X, float32(rnd.NormFloat64()*factor))
 		}
+		w.States = make([][]float32, StateTotal)
+		for i := range w.States {
+			w.States[i] = make([]float32, len(w.X))
+		}
 	}
 	set.Add("inputs", Width, Length)
 	inputs := set.ByName["inputs"]
 	inputs.X = append(inputs.X, w.X...)
+	inputs.States = make([][]float32, StateTotal)
+	for i := range inputs.States {
+		inputs.States[i] = make([]float32, len(inputs.X))
+	}
 
-	l1 := tf32.Softmax(tf32.Mul(set.Get("words"), set.Get("inputs")))
+	//spherical := tf32.U(SphericalSoftmaxReal)
+	l1 := dropout(tf32.Softmax(tf32.Mul(set.Get("words"), set.Get("inputs"))))
 	l2 := tf32.Softmax(tf32.Mul(tf32.T(set.Get("words")), l1))
-	e := tf32.Entropy(l2)
+	cost := tf32.Avg(tf32.Entropy(l2))
+
+	i := 1
+	pow := func(x float32) float32 {
+		y := math.Pow(float64(x), float64(i))
+		if math.IsNaN(y) || math.IsInf(y, 0) {
+			return 0
+		}
+		return float32(y)
+	}
+	// The stochastic gradient descent loop
+	for i < Epochs+1 {
+		// Calculate the gradients
+		total := tf32.Gradient(cost).X[0]
+
+		// Update the point weights with the partial derivatives using adam
+		b1, b2 := pow(B1), pow(B2)
+
+		for k, d := range w.D[Offset:] {
+			k += Offset
+			g := d
+			m := B1*w.States[StateM][k] + (1-B1)*g
+			v := B2*w.States[StateV][k] + (1-B2)*g*g
+			w.States[StateM][k] = m
+			w.States[StateV][k] = v
+			mhat := m / (1 - b1)
+			vhat := v / (1 - b2)
+			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
+		}
+		for k, d := range inputs.D[Offset:] {
+			k += Offset
+			g := d
+			m := B1*inputs.States[StateM][k] + (1-B1)*g
+			v := B2*inputs.States[StateV][k] + (1-B2)*g*g
+			inputs.States[StateM][k] = m
+			inputs.States[StateV][k] = v
+			mhat := m / (1 - b1)
+			vhat := v / (1 - b2)
+			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
+		}
+		copy(inputs.X, w.X)
+
+		// Housekeeping
+		set.Zero()
+
+		if math.IsNaN(float64(total)) {
+			fmt.Println(total)
+			break
+		}
+
+		i++
+	}
+
+	il1 := tf32.Softmax(tf32.Mul(set.Get("words"), set.Get("inputs")))
+	il2 := tf32.Softmax(tf32.Mul(tf32.T(set.Get("words")), il1))
+	e := tf32.Entropy(il2)
 
 	entropies := make([]Entropy, 0, 8)
 	e(func(a *tf32.V) bool {
@@ -1116,19 +1209,26 @@ func main() {
 		statistics[i] = make([]int, len(words))
 	}
 
-	for i := 0; i < 8*1024; i++ {
+	for i := 0; i < 128; i++ {
 		e := sample(rnd, vectors)
 		for j, value := range e {
+			if j > 2 {
+				statistics[value.Index][e[j-2].Index]++
+			}
 			if j > 1 {
 				statistics[value.Index][e[j-1].Index]++
 			}
 			if j < len(words)-1 {
 				statistics[value.Index][e[j+1].Index]++
 			}
+			if j < len(words)-2 {
+				statistics[value.Index][e[j+2].Index]++
+			}
+
 		}
 	}
 	fmt.Println(words[0])
 	for i, value := range statistics[0] {
-		fmt.Println(value, words[i])
+		fmt.Println(value, words[i], dictionary[words[i]])
 	}
 }
