@@ -424,6 +424,8 @@ var (
 	FlagRank = flag.Bool("rank", false, "page rank mode")
 	// FlagNeural runs the program in neural mode
 	FlagNeural = flag.Bool("neural", false, "neural mode")
+	// FlagGradient is the gradient descent mode
+	FlagGradient = flag.Bool("gradient", false, "gradient descent mode")
 )
 
 // Entropy is the output self entropy of the model
@@ -843,6 +845,70 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 	return x, y
 }
 
+// GradientDescent is the gradient descent model
+func GradientDescent(dictionary map[string]string, words []string, vectors []float64) {
+	type Word struct {
+		Word  string
+		Value float64
+		Index int
+	}
+	project := func(words []string, vectors []float64) []Word {
+		projection := make([]Word, 0, 8)
+		dense := mat.NewDense(Words, Width, vectors)
+		var pc stat.PC
+		ok := pc.PrincipalComponents(dense, nil)
+		if !ok {
+			panic("PrincipalComponents failed")
+		}
+		k := 1
+		var proj mat.Dense
+		var vec mat.Dense
+		pc.VectorsTo(&vec)
+		proj.Mul(dense, vec.Slice(0, Width, 0, k))
+		for i := 0; i < Words; i++ {
+			projection = append(projection, Word{
+				Word:  words[i],
+				Value: proj.At(i, 0),
+				Index: i,
+			})
+		}
+		sort.Slice(projection, func(i, j int) bool {
+			return projection[i].Value < projection[j].Value
+		})
+		return projection
+	}
+	projectionEnglish := project(words[:Words], vectors[:Words*Width])
+	projectionGerman := project(words[Words:], vectors[Words*Width:2*Words*Width])
+	vectorsNew := make([]float64, len(vectors))
+	wordsNew := make([]string, len(words))
+	for i, value := range projectionEnglish {
+		copy(vectorsNew[Width*i:Width*i+Width], vectors[Width*value.Index:Width*value.Index+Width])
+		wordsNew[i] = words[value.Index]
+	}
+	for i, value := range projectionGerman {
+		i += Words
+		value.Index += Words
+		copy(vectorsNew[Width*i:Width*i+Width], vectors[Width*value.Index:Width*value.Index+Width])
+		wordsNew[i] = words[value.Index]
+	}
+	words, vectors = wordsNew, vectorsNew
+
+	rnd := rand.New(rand.NewSource(1))
+
+	for i := 0; i < 3; i++ {
+		_, y := process(rnd, i, dictionary, words, vectors)
+
+		vectorsNew := make([]float64, len(vectors))
+		wordsNew := make([]string, len(words))
+		for i, value := range y {
+			copy(vectorsNew[Width*i:Width*i+Width], vectors[Width*value.Index:Width*value.Index+Width])
+			wordsNew[i] = words[value.Index]
+		}
+		words, vectors = wordsNew, vectorsNew
+	}
+	return
+}
+
 func main() {
 	rand.Seed(1)
 	flag.Parse()
@@ -999,63 +1065,7 @@ func main() {
 		}
 	}
 
-	type Word struct {
-		Word  string
-		Value float64
-		Index int
-	}
-	project := func(words []string, vectors []float64) []Word {
-		projection := make([]Word, 0, 8)
-		dense := mat.NewDense(Words, Width, vectors)
-		var pc stat.PC
-		ok := pc.PrincipalComponents(dense, nil)
-		if !ok {
-			panic("PrincipalComponents failed")
-		}
-		k := 1
-		var proj mat.Dense
-		var vec mat.Dense
-		pc.VectorsTo(&vec)
-		proj.Mul(dense, vec.Slice(0, Width, 0, k))
-		for i := 0; i < Words; i++ {
-			projection = append(projection, Word{
-				Word:  words[i],
-				Value: proj.At(i, 0),
-				Index: i,
-			})
-		}
-		sort.Slice(projection, func(i, j int) bool {
-			return projection[i].Value < projection[j].Value
-		})
-		return projection
-	}
-	projectionEnglish := project(words[:Words], vectors[:Words*Width])
-	projectionGerman := project(words[Words:], vectors[Words*Width:2*Words*Width])
-	vectorsNew := make([]float64, len(vectors))
-	wordsNew := make([]string, len(words))
-	for i, value := range projectionEnglish {
-		copy(vectorsNew[Width*i:Width*i+Width], vectors[Width*value.Index:Width*value.Index+Width])
-		wordsNew[i] = words[value.Index]
-	}
-	for i, value := range projectionGerman {
-		i += Words
-		value.Index += Words
-		copy(vectorsNew[Width*i:Width*i+Width], vectors[Width*value.Index:Width*value.Index+Width])
-		wordsNew[i] = words[value.Index]
-	}
-	words, vectors = wordsNew, vectorsNew
-
-	rnd := rand.New(rand.NewSource(1))
-
-	for i := 0; i < 3; i++ {
-		_, y := process(rnd, i, dictionary, words, vectors)
-
-		vectorsNew := make([]float64, len(vectors))
-		wordsNew := make([]string, len(words))
-		for i, value := range y {
-			copy(vectorsNew[Width*i:Width*i+Width], vectors[Width*value.Index:Width*value.Index+Width])
-			wordsNew[i] = words[value.Index]
-		}
-		words, vectors = wordsNew, vectorsNew
+	if *FlagGradient {
+		GradientDescent(dictionary, words, vectors)
 	}
 }
