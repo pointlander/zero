@@ -909,6 +909,46 @@ func GradientDescent(dictionary map[string]string, words []string, vectors []flo
 	return
 }
 
+func sample(rnd *rand.Rand, vectors []float64) []Entropy {
+	set := tf32.NewSet()
+	set.Add("words", Width, Length)
+	w := set.ByName["words"]
+	for _, w := range set.Weights {
+		factor := math.Sqrt(2.0 / float64(w.S[0]))
+		size := cap(w.X)
+		for _, value := range vectors {
+			w.X = append(w.X, float32(value))
+		}
+		for i := Offset; i < size; i++ {
+			w.X = append(w.X, float32(rnd.NormFloat64()*factor))
+		}
+	}
+	set.Add("inputs", Width, Length)
+	inputs := set.ByName["inputs"]
+	inputs.X = append(inputs.X, w.X...)
+
+	l1 := tf32.Softmax(tf32.Mul(set.Get("words"), set.Get("inputs")))
+	l2 := tf32.Softmax(tf32.Mul(tf32.T(set.Get("words")), l1))
+	e := tf32.Entropy(l2)
+
+	entropies := make([]Entropy, 0, 8)
+	e(func(a *tf32.V) bool {
+		for key, value := range a.X {
+			if key >= Length/2 {
+				entropies = append(entropies, Entropy{
+					Index:   key - Length/2,
+					Entropy: value,
+				})
+			}
+		}
+		return true
+	})
+	sort.Slice(entropies, func(i, j int) bool {
+		return entropies[i].Entropy < entropies[j].Entropy
+	})
+	return entropies
+}
+
 func main() {
 	rand.Seed(1)
 	flag.Parse()
@@ -1067,5 +1107,28 @@ func main() {
 
 	if *FlagGradient {
 		GradientDescent(dictionary, words, vectors)
+		return
+	}
+
+	rnd := rand.New(rand.NewSource(1))
+	statistics := make([][]int, len(words))
+	for i := range statistics {
+		statistics[i] = make([]int, len(words))
+	}
+
+	for i := 0; i < 8*1024; i++ {
+		e := sample(rnd, vectors)
+		for j, value := range e {
+			if j > 1 {
+				statistics[value.Index][e[j-1].Index]++
+			}
+			if j < len(words)-1 {
+				statistics[value.Index][e[j+1].Index]++
+			}
+		}
+	}
+	fmt.Println(words[0])
+	for i, value := range statistics[0] {
+		fmt.Println(value, words[i])
 	}
 }
