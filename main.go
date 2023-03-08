@@ -32,6 +32,9 @@ import (
 	"github.com/pointlander/pagerank"
 )
 
+// TODO: don't use random values in the attention network
+// TODO: use kmeans on output of attention network
+
 const (
 	// Size is the size of the square matrix
 	Size = 10
@@ -779,7 +782,7 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 				sum += a * b
 			}
 			ranks = append(ranks, Rank{
-				Index: i,
+				Index: i - Length/2,
 				Rank:  sum / (float32(math.Sqrt(float64(aa)) * math.Sqrt(float64(bb)))),
 			})
 		}
@@ -789,7 +792,7 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 		return ranks[i].Rank > ranks[j].Rank
 	})
 	for _, rank := range ranks {
-		fmt.Fprintln(debug, rank)
+		fmt.Fprintln(debug, words[rank.Index], rank)
 	}
 
 	accuracy := func(x []Entropy) float64 {
