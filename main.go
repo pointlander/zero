@@ -45,7 +45,7 @@ const (
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
 	// Eta is the learning rate
-	Eta = .001
+	Eta = .0001
 	// Epochs is the number of epochs
 	Epochs = 64
 	// Width is the width of the model
@@ -961,10 +961,9 @@ func NewState() State {
 func (s *State) sample(vectors []float64) []Entropy {
 	rnd, dropout := s.Rnd, s.Dropout
 	_ = rnd
-	set := tf32.NewSet()
-	set.Add("words", Width, Length/2)
-	w := set.ByName["words"]
-	for _, w := range set.Weights {
+	other := tf32.NewSet()
+	other.Add("words", Width, Length/2)
+	for _, w := range other.Weights {
 		factor := math.Sqrt(2.0 / float64(w.S[0]))
 		size := cap(w.X)
 		_, _ = factor, size
@@ -979,17 +978,32 @@ func (s *State) sample(vectors []float64) []Entropy {
 			w.States[i] = make([]float32, len(w.X))
 		}
 	}
-	set.Add("inputs", Width, Length/2)
+	set := tf32.NewSet()
+	set.Add("t", Width, 2*Width)
+	t := set.ByName["t"]
+	for _, w := range set.Weights {
+		factor := math.Sqrt(2.0 / float64(w.S[0]))
+		size := cap(w.X)
+		for i := 0; i < size; i++ {
+			w.X = append(w.X, float32(rnd.NormFloat64()*factor))
+		}
+		w.States = make([][]float32, StateTotal)
+		for i := range w.States {
+			w.States[i] = make([]float32, len(w.X))
+		}
+	}
+	/*set.Add("inputs", Width, Length/2)
 	inputs := set.ByName["inputs"]
 	inputs.X = append(inputs.X, w.X...)
 	inputs.States = make([][]float32, StateTotal)
 	for i := range inputs.States {
 		inputs.States[i] = make([]float32, len(inputs.X))
-	}
+	}*/
 
-	//spherical := tf32.U(SphericalSoftmaxReal)
-	l1 := dropout(tf32.Softmax(tf32.Mul(set.Get("words"), set.Get("inputs"))))
-	l2 := tf32.Softmax(tf32.Mul(tf32.T(set.Get("words")), l1))
+	spherical := tf32.U(SphericalSoftmaxReal)
+	encoded := tf32.Mul(set.Get("t"), other.Get("words"))
+	l1 := dropout(spherical(tf32.Mul(encoded, encoded)))
+	l2 := spherical(tf32.Mul(tf32.T(encoded), l1))
 	cost := tf32.Avg(tf32.Entropy(l2))
 
 	i := 1
@@ -1001,36 +1015,24 @@ func (s *State) sample(vectors []float64) []Entropy {
 		return float32(y)
 	}
 	// The stochastic gradient descent loop
-	for i < 600 {
+	for i < 16*1024 {
 		// Calculate the gradients
 		total := tf32.Gradient(cost).X[0]
 
 		// Update the point weights with the partial derivatives using adam
 		b1, b2 := pow(B1), pow(B2)
 
-		for k, d := range w.D /*[Offset:]*/ {
+		for k, d := range t.D /*[Offset:]*/ {
 			//k += Offset
 			g := d
-			m := B1*w.States[StateM][k] + (1-B1)*g
-			v := B2*w.States[StateV][k] + (1-B2)*g*g
-			w.States[StateM][k] = m
-			w.States[StateV][k] = v
+			m := B1*t.States[StateM][k] + (1-B1)*g
+			v := B2*t.States[StateV][k] + (1-B2)*g*g
+			t.States[StateM][k] = m
+			t.States[StateV][k] = v
 			mhat := m / (1 - b1)
 			vhat := v / (1 - b2)
-			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
+			t.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
 		}
-		for k, d := range inputs.D /*[Offset:]*/ {
-			//k += Offset
-			g := d
-			m := B1*inputs.States[StateM][k] + (1-B1)*g
-			v := B2*inputs.States[StateV][k] + (1-B2)*g*g
-			inputs.States[StateM][k] = m
-			inputs.States[StateV][k] = v
-			mhat := m / (1 - b1)
-			vhat := v / (1 - b2)
-			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
-		}
-		copy(inputs.X, w.X)
 
 		// Housekeeping
 		set.Zero()
@@ -1044,8 +1046,9 @@ func (s *State) sample(vectors []float64) []Entropy {
 		i++
 	}
 
-	il1 := tf32.Softmax(tf32.Mul(set.Get("words"), set.Get("inputs")))
-	il2 := tf32.Softmax(tf32.Mul(tf32.T(set.Get("words")), il1))
+	iencoded := tf32.Mul(set.Get("t"), other.Get("words"))
+	il1 := spherical(tf32.Mul(iencoded, iencoded))
+	il2 := spherical(tf32.Mul(tf32.T(iencoded), il1))
 	e := tf32.Entropy(il2)
 
 	entropies := make([]Entropy, 0, 8)
