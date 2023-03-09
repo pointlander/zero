@@ -912,12 +912,21 @@ func GradientDescent(dictionary map[string]string, words []string, vectors []flo
 	return
 }
 
-func sample(rnd *rand.Rand, vectors []float64) []Entropy {
+// State is the state of the sampler
+type State struct {
+	Points  plotter.XYs
+	Rnd     *rand.Rand
+	Dropout func(a tf32.Meta, options ...map[string]interface{}) tf32.Meta
+}
+
+// NewState creates a new State
+func NewState() State {
+	rnd := rand.New(rand.NewSource(1))
 	dropout := tf32.U(func(k tf32.Continuation, node int, a *tf32.V, options ...map[string]interface{}) bool {
 		size, width := len(a.X), a.S[0]
-		c, drops, factor := tf32.NewV(a.S...), make([]int, width), float32(1)/(1-.5)
+		c, drops, factor := tf32.NewV(a.S...), make([]int, width), float32(1)/(1-.1)
 		for i := range drops {
-			if rnd.Float64() > .5 {
+			if rnd.Float64() > .1 {
 				drops[i] = 1
 			}
 		}
@@ -942,24 +951,35 @@ func sample(rnd *rand.Rand, vectors []float64) []Entropy {
 		return false
 	})
 
+	return State{
+		Points:  make(plotter.XYs, 0, 8),
+		Rnd:     rnd,
+		Dropout: dropout,
+	}
+}
+
+func (s *State) sample(vectors []float64) []Entropy {
+	rnd, dropout := s.Rnd, s.Dropout
+	_ = rnd
 	set := tf32.NewSet()
-	set.Add("words", Width, Length)
+	set.Add("words", Width, Length/2)
 	w := set.ByName["words"]
 	for _, w := range set.Weights {
 		factor := math.Sqrt(2.0 / float64(w.S[0]))
 		size := cap(w.X)
+		_, _ = factor, size
 		for _, value := range vectors {
 			w.X = append(w.X, float32(value))
 		}
-		for i := Offset; i < size; i++ {
+		/*for i := Offset; i < size; i++ {
 			w.X = append(w.X, float32(rnd.NormFloat64()*factor))
-		}
+		}*/
 		w.States = make([][]float32, StateTotal)
 		for i := range w.States {
 			w.States[i] = make([]float32, len(w.X))
 		}
 	}
-	set.Add("inputs", Width, Length)
+	set.Add("inputs", Width, Length/2)
 	inputs := set.ByName["inputs"]
 	inputs.X = append(inputs.X, w.X...)
 	inputs.States = make([][]float32, StateTotal)
@@ -981,15 +1001,15 @@ func sample(rnd *rand.Rand, vectors []float64) []Entropy {
 		return float32(y)
 	}
 	// The stochastic gradient descent loop
-	for i < Epochs+1 {
+	for i < 600 {
 		// Calculate the gradients
 		total := tf32.Gradient(cost).X[0]
 
 		// Update the point weights with the partial derivatives using adam
 		b1, b2 := pow(B1), pow(B2)
 
-		for k, d := range w.D[Offset:] {
-			k += Offset
+		for k, d := range w.D /*[Offset:]*/ {
+			//k += Offset
 			g := d
 			m := B1*w.States[StateM][k] + (1-B1)*g
 			v := B2*w.States[StateV][k] + (1-B2)*g*g
@@ -999,8 +1019,8 @@ func sample(rnd *rand.Rand, vectors []float64) []Entropy {
 			vhat := v / (1 - b2)
 			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
 		}
-		for k, d := range inputs.D[Offset:] {
-			k += Offset
+		for k, d := range inputs.D /*[Offset:]*/ {
+			//k += Offset
 			g := d
 			m := B1*inputs.States[StateM][k] + (1-B1)*g
 			v := B2*inputs.States[StateV][k] + (1-B2)*g*g
@@ -1020,6 +1040,7 @@ func sample(rnd *rand.Rand, vectors []float64) []Entropy {
 			break
 		}
 
+		s.Points = append(s.Points, plotter.XY{X: float64(len(s.Points)), Y: float64(total)})
 		i++
 	}
 
@@ -1030,12 +1051,12 @@ func sample(rnd *rand.Rand, vectors []float64) []Entropy {
 	entropies := make([]Entropy, 0, 8)
 	e(func(a *tf32.V) bool {
 		for key, value := range a.X {
-			if key >= Length/2 {
-				entropies = append(entropies, Entropy{
-					Index:   key - Length/2,
-					Entropy: value,
-				})
-			}
+			//if key >= Length/2 {
+			entropies = append(entropies, Entropy{
+				Index:   key, // - Length/2,
+				Entropy: value,
+			})
+			//}
 		}
 		return true
 	})
@@ -1206,14 +1227,33 @@ func main() {
 		return
 	}
 
-	rnd := rand.New(rand.NewSource(1))
 	statistics := make([][]int, len(words))
 	for i := range statistics {
 		statistics[i] = make([]int, len(words))
 	}
 
-	for i := 0; i < 128; i++ {
-		e := sample(rnd, vectors)
+	accuracy := func(x []Entropy) float64 {
+		correctness := 0
+		for i := 0; i < Length/2; i++ {
+			start := words[x[i].Index]
+			target := dictionary[start]
+			for j := i + 1; j < Length/2; j++ {
+				if words[x[j].Index] == target {
+					correctness += j - i - 1
+					break
+				}
+			}
+		}
+		return 2 * float64(correctness) / Length
+	}
+
+	state := NewState()
+	for i := 0; i < 1; i++ {
+		e := state.sample(vectors)
+		for _, value := range e {
+			fmt.Println(value.Entropy, words[value.Index], dictionary[words[value.Index]])
+		}
+		fmt.Println(accuracy(e))
 		for j, value := range e {
 			if j > 2 {
 				statistics[value.Index][e[j-2].Index]++
@@ -1233,5 +1273,25 @@ func main() {
 	fmt.Println(words[0])
 	for i, value := range statistics[0] {
 		fmt.Println(value, words[i], dictionary[words[i]])
+	}
+
+	// Plot the cost
+	p := plot.New()
+
+	p.Title.Text = "epochs vs cost"
+	p.X.Label.Text = "epochs"
+	p.Y.Label.Text = "cost"
+
+	scatter, err := plotter.NewScatter(state.Points)
+	if err != nil {
+		panic(err)
+	}
+	scatter.GlyphStyle.Radius = vg.Length(1)
+	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+	p.Add(scatter)
+
+	err = p.Save(8*vg.Inch, 8*vg.Inch, "cost.png")
+	if err != nil {
+		panic(err)
 	}
 }
