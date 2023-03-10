@@ -45,9 +45,13 @@ const (
 	// S is the scaling factor for the softmax
 	S = 1.0 - 1e-300
 	// Eta is the learning rate
-	Eta = .0001
+	Eta = .001
 	// Epochs is the number of epochs
 	Epochs = 64
+	// EtaT is the learning rate for transform based model
+	EtaT = .0001
+	// EpochsT is the number of epochs for transform based model
+	EpochsT = 16 * 1024
 	// Width is the width of the model
 	Width = 300
 	// Length is the length of the model
@@ -970,9 +974,6 @@ func (s *State) sample(vectors []float64) []Entropy {
 		for _, value := range vectors {
 			w.X = append(w.X, float32(value))
 		}
-		/*for i := Offset; i < size; i++ {
-			w.X = append(w.X, float32(rnd.NormFloat64()*factor))
-		}*/
 		w.States = make([][]float32, StateTotal)
 		for i := range w.States {
 			w.States[i] = make([]float32, len(w.X))
@@ -992,13 +993,6 @@ func (s *State) sample(vectors []float64) []Entropy {
 			w.States[i] = make([]float32, len(w.X))
 		}
 	}
-	/*set.Add("inputs", Width, Length/2)
-	inputs := set.ByName["inputs"]
-	inputs.X = append(inputs.X, w.X...)
-	inputs.States = make([][]float32, StateTotal)
-	for i := range inputs.States {
-		inputs.States[i] = make([]float32, len(inputs.X))
-	}*/
 
 	spherical := tf32.U(SphericalSoftmaxReal)
 	encoded := tf32.Mul(set.Get("t"), other.Get("words"))
@@ -1015,15 +1009,14 @@ func (s *State) sample(vectors []float64) []Entropy {
 		return float32(y)
 	}
 	// The stochastic gradient descent loop
-	for i < 16*1024 {
+	for i < EpochsT {
 		// Calculate the gradients
 		total := tf32.Gradient(cost).X[0]
 
 		// Update the point weights with the partial derivatives using adam
 		b1, b2 := pow(B1), pow(B2)
 
-		for k, d := range t.D /*[Offset:]*/ {
-			//k += Offset
+		for k, d := range t.D {
 			g := d
 			m := B1*t.States[StateM][k] + (1-B1)*g
 			v := B2*t.States[StateV][k] + (1-B2)*g*g
@@ -1031,7 +1024,7 @@ func (s *State) sample(vectors []float64) []Entropy {
 			t.States[StateV][k] = v
 			mhat := m / (1 - b1)
 			vhat := v / (1 - b2)
-			t.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
+			t.X[k] -= EtaT * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
 		}
 
 		// Housekeeping
@@ -1054,12 +1047,10 @@ func (s *State) sample(vectors []float64) []Entropy {
 	entropies := make([]Entropy, 0, 8)
 	e(func(a *tf32.V) bool {
 		for key, value := range a.X {
-			//if key >= Length/2 {
 			entropies = append(entropies, Entropy{
-				Index:   key, // - Length/2,
+				Index:   key,
 				Entropy: value,
 			})
-			//}
 		}
 		return true
 	})
