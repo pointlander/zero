@@ -20,6 +20,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/muesli/clusters"
+	"github.com/muesli/kmeans"
 	"gonum.org/v1/gonum/mat"
 	"gonum.org/v1/gonum/stat"
 	"gonum.org/v1/plot"
@@ -849,6 +851,39 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 	fmt.Fprintln(debug, "+2 std", average+2*stddev)
 	fmt.Fprintln(debug, "+3 std", average+3*stddev)
 
+	var d clusters.Observations
+	l2(func(a *tf32.V) bool {
+		for i := 0; i < len(a.X)/2; i += Width {
+			c := clusters.Coordinates{}
+			for j := 0; j < Width; j++ {
+				c = append(c, float64(a.X[i+j+Length/2]))
+			}
+			d = append(d, c)
+		}
+		return true
+	})
+	km := kmeans.New()
+	clusters, err := km.Partition(d, Words)
+
+	for _, c := range clusters {
+		for _, o := range c.Observations {
+			q := o.Coordinates().Coordinates()
+			for i, v := range d {
+				same := true
+				for j, x := range v.Coordinates().Coordinates() {
+					if x != q[j] {
+						same = false
+						break
+					}
+				}
+				if same {
+					fmt.Printf("%d %s ", i, words[i])
+					break
+				}
+			}
+		}
+		fmt.Printf("\n")
+	}
 	return x, y
 }
 
