@@ -435,6 +435,8 @@ var (
 	FlagNeural = flag.Bool("neural", false, "neural mode")
 	// FlagGradient is the gradient descent mode
 	FlagGradient = flag.Bool("gradient", false, "gradient descent mode")
+	// FlagTransform transform based entropy minimization
+	FlagTransform = flag.Bool("transform", false, "transform based entropy minimization")
 )
 
 // Entropy is the output self entropy of the model
@@ -1143,6 +1145,77 @@ func (s *State) sample(words []string, vectors []float64) []Entropy {
 	return entropies
 }
 
+// Transform is transform mode
+func Transform(dictionary map[string]string, words []string, vectors []float64) {
+	statistics := make([][]int, len(words))
+	for i := range statistics {
+		statistics[i] = make([]int, len(words))
+	}
+
+	accuracy := func(x []Entropy) float64 {
+		correctness := 0
+		for i := 0; i < Length/2; i++ {
+			start := words[x[i].Index]
+			target := dictionary[start]
+			for j := i + 1; j < Length/2; j++ {
+				if words[x[j].Index] == target {
+					correctness += j - i - 1
+					break
+				}
+			}
+		}
+		return 2 * float64(correctness) / Length
+	}
+
+	state := NewState()
+	for i := 0; i < 1; i++ {
+		e := state.sample(words, vectors)
+		for _, value := range e {
+			fmt.Println(value.Entropy, words[value.Index], dictionary[words[value.Index]])
+		}
+		fmt.Println(accuracy(e))
+		for j, value := range e {
+			if j > 2 {
+				statistics[value.Index][e[j-2].Index]++
+			}
+			if j > 1 {
+				statistics[value.Index][e[j-1].Index]++
+			}
+			if j < len(words)-1 {
+				statistics[value.Index][e[j+1].Index]++
+			}
+			if j < len(words)-2 {
+				statistics[value.Index][e[j+2].Index]++
+			}
+
+		}
+	}
+	fmt.Println(words[0])
+	for i, value := range statistics[0] {
+		fmt.Println(value, words[i], dictionary[words[i]])
+	}
+
+	// Plot the cost
+	p := plot.New()
+
+	p.Title.Text = "epochs vs cost"
+	p.X.Label.Text = "epochs"
+	p.Y.Label.Text = "cost"
+
+	scatter, err := plotter.NewScatter(state.Points)
+	if err != nil {
+		panic(err)
+	}
+	scatter.GlyphStyle.Radius = vg.Length(1)
+	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+	p.Add(scatter)
+
+	err = p.Save(8*vg.Inch, 8*vg.Inch, "cost.png")
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
 	rand.Seed(1)
 	flag.Parse()
@@ -1302,73 +1375,8 @@ func main() {
 	if *FlagGradient {
 		GradientDescent(dictionary, words, vectors)
 		return
-	}
-
-	statistics := make([][]int, len(words))
-	for i := range statistics {
-		statistics[i] = make([]int, len(words))
-	}
-
-	accuracy := func(x []Entropy) float64 {
-		correctness := 0
-		for i := 0; i < Length/2; i++ {
-			start := words[x[i].Index]
-			target := dictionary[start]
-			for j := i + 1; j < Length/2; j++ {
-				if words[x[j].Index] == target {
-					correctness += j - i - 1
-					break
-				}
-			}
-		}
-		return 2 * float64(correctness) / Length
-	}
-
-	state := NewState()
-	for i := 0; i < 1; i++ {
-		e := state.sample(words, vectors)
-		for _, value := range e {
-			fmt.Println(value.Entropy, words[value.Index], dictionary[words[value.Index]])
-		}
-		fmt.Println(accuracy(e))
-		for j, value := range e {
-			if j > 2 {
-				statistics[value.Index][e[j-2].Index]++
-			}
-			if j > 1 {
-				statistics[value.Index][e[j-1].Index]++
-			}
-			if j < len(words)-1 {
-				statistics[value.Index][e[j+1].Index]++
-			}
-			if j < len(words)-2 {
-				statistics[value.Index][e[j+2].Index]++
-			}
-
-		}
-	}
-	fmt.Println(words[0])
-	for i, value := range statistics[0] {
-		fmt.Println(value, words[i], dictionary[words[i]])
-	}
-
-	// Plot the cost
-	p := plot.New()
-
-	p.Title.Text = "epochs vs cost"
-	p.X.Label.Text = "epochs"
-	p.Y.Label.Text = "cost"
-
-	scatter, err := plotter.NewScatter(state.Points)
-	if err != nil {
-		panic(err)
-	}
-	scatter.GlyphStyle.Radius = vg.Length(1)
-	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
-	p.Add(scatter)
-
-	err = p.Save(8*vg.Inch, 8*vg.Inch, "cost.png")
-	if err != nil {
-		panic(err)
+	} else if *FlagTransform {
+		Transform(dictionary, words, vectors)
+		return
 	}
 }
