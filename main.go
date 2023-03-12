@@ -871,6 +871,9 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 	}
 	km := kmeans.New()
 	clusters, err := km.Partition(d, Words)
+	if err != nil {
+		panic(err)
+	}
 
 	for _, c := range clusters {
 		for _, o := range c.Observations {
@@ -884,12 +887,12 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 					}
 				}
 				if same {
-					fmt.Printf("%d %s ", i, words[i])
+					fmt.Fprintf(debug, "%d %s ", i, words[i])
 					break
 				}
 			}
 		}
-		fmt.Printf("\n")
+		fmt.Fprintf(debug, "\n")
 	}
 	return x, y
 }
@@ -1004,7 +1007,7 @@ func NewState() State {
 	}
 }
 
-func (s *State) sample(vectors []float64) []Entropy {
+func (s *State) sample(words []string, vectors []float64) []Entropy {
 	rnd, dropout := s.Rnd, s.Dropout
 	_ = rnd
 	other := tf32.NewSet()
@@ -1099,6 +1102,44 @@ func (s *State) sample(vectors []float64) []Entropy {
 	sort.Slice(entropies, func(i, j int) bool {
 		return entropies[i].Entropy < entropies[j].Entropy
 	})
+
+	var d clusters.Observations
+	iencoded(func(a *tf32.V) bool {
+		for i := 0; i < len(a.X); i += 2 * Width {
+			c := clusters.Coordinates{}
+			for j := 0; j < 2*Width; j++ {
+				c = append(c, float64(a.X[i+j]))
+			}
+			d = append(d, c)
+		}
+		return true
+	})
+	km := kmeans.New()
+	clusters, err := km.Partition(d, Words)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, c := range clusters {
+		for _, o := range c.Observations {
+			q := o.Coordinates().Coordinates()
+			for i, v := range d {
+				same := true
+				for j, x := range v.Coordinates().Coordinates() {
+					if x != q[j] {
+						same = false
+						break
+					}
+				}
+				if same {
+					fmt.Printf("%d %s ", i, words[i])
+					break
+				}
+			}
+		}
+		fmt.Printf("\n")
+	}
+
 	return entropies
 }
 
@@ -1285,7 +1326,7 @@ func main() {
 
 	state := NewState()
 	for i := 0; i < 1; i++ {
-		e := state.sample(vectors)
+		e := state.sample(words, vectors)
 		for _, value := range e {
 			fmt.Println(value.Entropy, words[value.Index], dictionary[words[value.Index]])
 		}
