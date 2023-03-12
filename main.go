@@ -862,7 +862,7 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 		}
 		return true
 	})*/
-	for i := 0; i < len(w.X)/2; i += Width {
+	for i := len(w.X) / 2; i < len(w.X); i += Width {
 		c := clusters.Coordinates{}
 		for j := 0; j < Width; j++ {
 			c = append(c, float64(w.X[i+j]))
