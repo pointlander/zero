@@ -852,7 +852,7 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 	fmt.Fprintln(debug, "+3 std", average+3*stddev)
 
 	var d clusters.Observations
-	l2(func(a *tf32.V) bool {
+	/*l2(func(a *tf32.V) bool {
 		for i := 0; i < len(a.X)/2; i += Width {
 			c := clusters.Coordinates{}
 			for j := 0; j < Width; j++ {
@@ -861,7 +861,14 @@ func process(rnd *rand.Rand, iteration int, dictionary map[string]string, words 
 			d = append(d, c)
 		}
 		return true
-	})
+	})*/
+	for i := 0; i < len(w.X)/2; i += Width {
+		c := clusters.Coordinates{}
+		for j := 0; j < Width; j++ {
+			c = append(c, float64(w.X[i+j]))
+		}
+		d = append(d, c)
+	}
 	km := kmeans.New()
 	clusters, err := km.Partition(d, Words)
 
