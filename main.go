@@ -1013,7 +1013,7 @@ func NewState() State {
 	}
 }
 
-func (s *State) autoencode(words []string, vectors []float64) {
+func (s *State) autoencode(dictionary map[string]string, words []string, vectors []float64) {
 	rnd, dropout := s.Rnd, s.Dropout
 	_ = rnd
 	other := tf32.NewSet()
@@ -1090,8 +1090,11 @@ func (s *State) autoencode(words []string, vectors []float64) {
 		i++
 	}
 
+	iencoded := tf32.Mul(set.Get("t"), other.Get("words"))
+	il1 := spherical(tf32.Mul(encoded, encoded))
+
 	var d clusters.Observations
-	encoded(func(a *tf32.V) bool {
+	iencoded(func(a *tf32.V) bool {
 		for i := 0; i < len(a.X); i += Width {
 			c := clusters.Coordinates{}
 			for j := 0; j < Width; j++ {
@@ -1127,6 +1130,29 @@ func (s *State) autoencode(words []string, vectors []float64) {
 		fmt.Printf("\n")
 	}
 
+	il1(func(a *tf32.V) bool {
+		for i := 0; i < Length/2; i++ {
+			max, index := float32(0.0), 0
+			for j := 0; j < Length/2; j++ {
+				if i == j {
+					continue
+				}
+				a := a.X[i*(Length/2)+j]
+				if a > max {
+					max, index = a, j
+				}
+			}
+			word := words[i]
+			expected := dictionary[word]
+			actual := dictionary[words[index]]
+			if expected == actual {
+				fmt.Println("correct", i, word, expected, actual)
+			} else {
+				fmt.Println(i, word, expected, actual)
+			}
+		}
+		return true
+	})
 	return
 }
 
@@ -1502,7 +1528,7 @@ func main() {
 	}
 
 	state := NewState()
-	state.autoencode(words, vectors)
+	state.autoencode(dictionary, words, vectors)
 
 	// Plot the cost
 	p := plot.New()
