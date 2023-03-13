@@ -54,6 +54,10 @@ const (
 	EtaT = .0001
 	// EpochsT is the number of epochs for transform based model
 	EpochsT = 16 * 1024
+	// EtaA is the learning rate for autoencoder based model
+	EtaA = .1
+	// EpochsT is the number of epochs for autoencoder based model
+	EpochsA = 128
 	// Width is the width of the model
 	Width = 300
 	// Length is the length of the model
@@ -1009,6 +1013,123 @@ func NewState() State {
 	}
 }
 
+func (s *State) autoencode(words []string, vectors []float64) {
+	rnd, dropout := s.Rnd, s.Dropout
+	_ = rnd
+	other := tf32.NewSet()
+	other.Add("words", Width, Length/2)
+	for _, w := range other.Weights {
+		factor := math.Sqrt(2.0 / float64(w.S[0]))
+		size := cap(w.X)
+		_, _ = factor, size
+		for _, value := range vectors {
+			w.X = append(w.X, float32(value))
+		}
+		w.States = make([][]float32, StateTotal)
+		for i := range w.States {
+			w.States[i] = make([]float32, len(w.X))
+		}
+	}
+	set := tf32.NewSet()
+	set.Add("t", Width, Width)
+	t := set.ByName["t"]
+	for _, w := range set.Weights {
+		factor := math.Sqrt(2.0 / float64(w.S[0]))
+		size := cap(w.X)
+		for i := 0; i < size; i++ {
+			w.X = append(w.X, float32(rnd.NormFloat64()*factor))
+		}
+		w.States = make([][]float32, StateTotal)
+		for i := range w.States {
+			w.States[i] = make([]float32, len(w.X))
+		}
+	}
+
+	spherical := tf32.U(SphericalSoftmaxReal)
+	encoded := tf32.Mul(set.Get("t"), other.Get("words"))
+	l1 := dropout(spherical(tf32.Mul(encoded, encoded)))
+	l2 := tf32.Mul(tf32.T(encoded), l1)
+	cost := tf32.Avg(tf32.Quadratic(other.Get("words"), l2))
+
+	i := 1
+	pow := func(x float32) float32 {
+		y := math.Pow(float64(x), float64(i))
+		if math.IsNaN(y) || math.IsInf(y, 0) {
+			return 0
+		}
+		return float32(y)
+	}
+	// The stochastic gradient descent loop
+	for i < EpochsA {
+		// Calculate the gradients
+		total := tf32.Gradient(cost).X[0]
+
+		// Update the point weights with the partial derivatives using adam
+		b1, b2 := pow(B1), pow(B2)
+
+		for k, d := range t.D {
+			g := d
+			m := B1*t.States[StateM][k] + (1-B1)*g
+			v := B2*t.States[StateV][k] + (1-B2)*g*g
+			t.States[StateM][k] = m
+			t.States[StateV][k] = v
+			mhat := m / (1 - b1)
+			vhat := v / (1 - b2)
+			t.X[k] -= EtaA * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
+		}
+
+		// Housekeeping
+		set.Zero()
+
+		if math.IsNaN(float64(total)) {
+			fmt.Println(total)
+			break
+		}
+		fmt.Println(i, total)
+		s.Points = append(s.Points, plotter.XY{X: float64(len(s.Points)), Y: float64(total)})
+		i++
+	}
+
+	var d clusters.Observations
+	encoded(func(a *tf32.V) bool {
+		for i := 0; i < len(a.X); i += Width {
+			c := clusters.Coordinates{}
+			for j := 0; j < Width; j++ {
+				c = append(c, float64(a.X[i+j]))
+			}
+			d = append(d, c)
+		}
+		return true
+	})
+	km := kmeans.New()
+	clusters, err := km.Partition(d, Words)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, c := range clusters {
+		for _, o := range c.Observations {
+			q := o.Coordinates().Coordinates()
+			for i, v := range d {
+				same := true
+				for j, x := range v.Coordinates().Coordinates() {
+					if x != q[j] {
+						same = false
+						break
+					}
+				}
+				if same {
+					fmt.Printf("%d %s ", i, words[i])
+					break
+				}
+			}
+		}
+		fmt.Printf("\n")
+	}
+
+	return
+}
+
 func (s *State) sample(words []string, vectors []float64) []Entropy {
 	rnd, dropout := s.Rnd, s.Dropout
 	_ = rnd
@@ -1378,5 +1499,28 @@ func main() {
 	} else if *FlagTransform {
 		Transform(dictionary, words, vectors)
 		return
+	}
+
+	state := NewState()
+	state.autoencode(words, vectors)
+
+	// Plot the cost
+	p := plot.New()
+
+	p.Title.Text = "epochs vs cost"
+	p.X.Label.Text = "epochs"
+	p.Y.Label.Text = "cost"
+
+	scatter, err := plotter.NewScatter(state.Points)
+	if err != nil {
+		panic(err)
+	}
+	scatter.GlyphStyle.Radius = vg.Length(1)
+	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+	p.Add(scatter)
+
+	err = p.Save(8*vg.Inch, 8*vg.Inch, "autoencoder_cost.png")
+	if err != nil {
+		panic(err)
 	}
 }
