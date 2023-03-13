@@ -1144,7 +1144,7 @@ func (s *State) autoencode(dictionary map[string]string, words []string, vectors
 			}
 			word := words[i]
 			expected := dictionary[word]
-			actual := dictionary[words[index]]
+			actual := words[index]
 			if expected == actual {
 				fmt.Println("correct", i, word, expected, actual)
 			} else {
