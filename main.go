@@ -57,7 +57,7 @@ const (
 	// EtaA is the learning rate for autoencoder based model
 	EtaA = .1
 	// EpochsT is the number of epochs for autoencoder based model
-	EpochsA = 128
+	EpochsA = 256
 	// Width is the width of the model
 	Width = 300
 	// Length is the length of the model
@@ -1014,16 +1014,25 @@ func NewState() State {
 }
 
 func (s *State) autoencode(dictionary map[string]string, words []string, vectors []float64) {
+	const Width = Width + 2
 	rnd, dropout := s.Rnd, s.Dropout
 	_ = rnd
 	other := tf32.NewSet()
 	other.Add("words", Width, Length/2)
+	w := other.ByName["words"]
 	for _, w := range other.Weights {
 		factor := math.Sqrt(2.0 / float64(w.S[0]))
 		size := cap(w.X)
 		_, _ = factor, size
-		for _, value := range vectors {
-			w.X = append(w.X, float32(value))
+		for i := 0; i < Length/2; i++ {
+			for j := 0; j < Width-2; j++ {
+				w.X = append(w.X, float32(vectors[i*(Width-2)+j]))
+			}
+			if i < Length/4 {
+				w.X = append(w.X, 0, 1)
+			} else {
+				w.X = append(w.X, 1, 0)
+			}
 		}
 		w.States = make([][]float32, StateTotal)
 		for i := range w.States {
@@ -1088,6 +1097,11 @@ func (s *State) autoencode(dictionary map[string]string, words []string, vectors
 		fmt.Println(i, total)
 		s.Points = append(s.Points, plotter.XY{X: float64(len(s.Points)), Y: float64(total)})
 		i++
+	}
+
+	for i := 0; i < Length/4; i++ {
+		w.X[i*Width+Width-2] = 1
+		w.X[i*Width+Width-1] = 0
 	}
 
 	iencoded := tf32.Mul(set.Get("t"), other.Get("words"))
