@@ -441,6 +441,8 @@ var (
 	FlagGradient = flag.Bool("gradient", false, "gradient descent mode")
 	// FlagTransform transform based entropy minimization
 	FlagTransform = flag.Bool("transform", false, "transform based entropy minimization")
+	// FlagAutoencode autoencoder mode
+	FlagAutoencode = flag.Bool("autoencode", false, "autoencoder mode")
 )
 
 // Entropy is the output self entropy of the model
@@ -1539,28 +1541,29 @@ func main() {
 	} else if *FlagTransform {
 		Transform(dictionary, words, vectors)
 		return
-	}
+	} else if *FlagAutoencode {
+		state := NewState()
+		state.autoencode(dictionary, words, vectors)
 
-	state := NewState()
-	state.autoencode(dictionary, words, vectors)
+		// Plot the cost
+		p := plot.New()
 
-	// Plot the cost
-	p := plot.New()
+		p.Title.Text = "epochs vs cost"
+		p.X.Label.Text = "epochs"
+		p.Y.Label.Text = "cost"
 
-	p.Title.Text = "epochs vs cost"
-	p.X.Label.Text = "epochs"
-	p.Y.Label.Text = "cost"
+		scatter, err := plotter.NewScatter(state.Points)
+		if err != nil {
+			panic(err)
+		}
+		scatter.GlyphStyle.Radius = vg.Length(1)
+		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+		p.Add(scatter)
 
-	scatter, err := plotter.NewScatter(state.Points)
-	if err != nil {
-		panic(err)
-	}
-	scatter.GlyphStyle.Radius = vg.Length(1)
-	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
-	p.Add(scatter)
-
-	err = p.Save(8*vg.Inch, 8*vg.Inch, "autoencoder_cost.png")
-	if err != nil {
-		panic(err)
+		err = p.Save(8*vg.Inch, 8*vg.Inch, "autoencoder_cost.png")
+		if err != nil {
+			panic(err)
+		}
+		return
 	}
 }
