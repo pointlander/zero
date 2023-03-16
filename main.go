@@ -428,9 +428,9 @@ func main() {
 	other := tc128.NewSet()
 	other.Add("X", Width, Length/2)
 	x := other.ByName["X"]
-	for i := 0; i < Length/2; i++ {
-		if i < Length/4 {
-			x.X = append(x.X, cmplx.Rect(vectors[i], math.Pi/4))
+	for i := 0; i < len(vectors); i++ {
+		if i < len(vectors)/2 {
+			x.X = append(x.X, cmplx.Rect(vectors[i], math.Pi/8))
 		} else {
 			x.X = append(x.X, complex(vectors[i], 0))
 		}
@@ -439,7 +439,7 @@ func main() {
 	l1 := tc128.Mul(set.Get("A"), other.Get("X"))
 	cost := tc128.Avg(tc128.Quadratic(other.Get("X"), l1))
 
-	iterations := 128
+	iterations := 256
 	points := make(plotter.XYs, 0, iterations)
 	phase := make(plotter.XYs, 0, iterations)
 	alpha, eta := complex(.3, 0), complex(.3, 0)
@@ -498,4 +498,32 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	x.X = x.X[:0]
+	for i := 0; i < len(vectors); i++ {
+		if i < len(vectors)/2 {
+			x.X = append(x.X, cmplx.Rect(vectors[i], 0))
+		} else {
+			x.X = append(x.X, complex(vectors[i], 0))
+		}
+	}
+
+	l1(func(a *tc128.V) bool {
+		max, index := float64(0.0), 0
+		for i := 1; i < Length/2; i++ {
+			var aa, bb, ab complex128
+			for j := 0; j < Width; j++ {
+				a, b := a.X[j], a.X[i*Width+j]
+				aa += a * a
+				bb += b * b
+				ab += a * b
+			}
+			s := ab / (cmplx.Sqrt(aa) * cmplx.Sqrt(bb))
+			if S := cmplx.Abs(s); S > max {
+				max, index = S, i
+			}
+		}
+		fmt.Println(words[index])
+		return true
+	})
 }
