@@ -513,29 +513,40 @@ func main() {
 		S float64
 		I int
 	}
-	pairs := make([]Pair, 0, 8)
+	pairs := make([][]Pair, Length/4)
+	for i := range pairs {
+		pairs[i] = make([]Pair, 0, 8)
+	}
 	l1(func(a *tc128.V) bool {
-		for i := Length / 4; i < Length/2; i++ {
-			var aa, bb, ab complex128
-			for j := 0; j < Width; j++ {
-				a, b := a.X[j], a.X[i*Width+j]
-				aa += a * a
-				bb += b * b
-				ab += a * b
+		for k := 0; k < Length/4; k++ {
+			for i := Length / 4; i < Length/2; i++ {
+				var aa, bb, ab complex128
+				for j := 0; j < Width; j++ {
+					a, b := a.X[k*Width+j], a.X[i*Width+j]
+					aa += a * a
+					bb += b * b
+					ab += a * b
+				}
+				s := ab / (cmplx.Sqrt(aa) * cmplx.Sqrt(bb))
+				pairs[k] = append(pairs[k], Pair{
+					S: cmplx.Abs(s),
+					I: i,
+				})
 			}
-			s := ab / (cmplx.Sqrt(aa) * cmplx.Sqrt(bb))
-			pairs = append(pairs, Pair{
-				S: cmplx.Abs(s),
-				I: i,
-			})
 		}
 		return true
 	})
-	sort.Slice(pairs, func(i, j int) bool {
-		return pairs[i].S > pairs[j].S
-	})
-	for _, pair := range pairs {
-		fmt.Println(pair.S, words[pair.I], dictionary[words[pair.I]])
+	a := float64(0.0)
+	for k := range pairs {
+		sort.Slice(pairs[k], func(i, j int) bool {
+			return pairs[k][i].S > pairs[k][j].S
+		})
+		for i, pair := range pairs[k] {
+			if words[k] == dictionary[words[pair.I]] {
+				a += float64(i)
+				break
+			}
+		}
 	}
-
+	fmt.Println("accuracy=", a/float64(Length/4))
 }
