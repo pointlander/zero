@@ -15,6 +15,7 @@ import (
 	"math/cmplx"
 	"math/rand"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -432,14 +433,14 @@ func main() {
 		if i < len(vectors)/2 {
 			x.X = append(x.X, cmplx.Rect(vectors[i], math.Pi/8))
 		} else {
-			x.X = append(x.X, complex(vectors[i], 0))
+			x.X = append(x.X, cmplx.Rect(vectors[i], -math.Pi/8))
 		}
 	}
 
 	l1 := tc128.Mul(set.Get("A"), other.Get("X"))
 	cost := tc128.Avg(tc128.Quadratic(other.Get("X"), l1))
 
-	iterations := 256
+	iterations := 1024
 	points := make(plotter.XYs, 0, iterations)
 	phase := make(plotter.XYs, 0, iterations)
 	alpha, eta := complex(.3, 0), complex(.3, 0)
@@ -504,13 +505,17 @@ func main() {
 		if i < len(vectors)/2 {
 			x.X = append(x.X, cmplx.Rect(vectors[i], 0))
 		} else {
-			x.X = append(x.X, complex(vectors[i], 0))
+			x.X = append(x.X, cmplx.Rect(vectors[i], 0))
 		}
 	}
 
+	type Pair struct {
+		S float64
+		I int
+	}
+	pairs := make([]Pair, 0, 8)
 	l1(func(a *tc128.V) bool {
-		max, index := float64(0.0), 0
-		for i := 1; i < Length/2; i++ {
+		for i := Length / 4; i < Length/2; i++ {
 			var aa, bb, ab complex128
 			for j := 0; j < Width; j++ {
 				a, b := a.X[j], a.X[i*Width+j]
@@ -519,11 +524,18 @@ func main() {
 				ab += a * b
 			}
 			s := ab / (cmplx.Sqrt(aa) * cmplx.Sqrt(bb))
-			if S := cmplx.Abs(s); S > max {
-				max, index = S, i
-			}
+			pairs = append(pairs, Pair{
+				S: cmplx.Abs(s),
+				I: i,
+			})
 		}
-		fmt.Println(words[index])
 		return true
 	})
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i].S > pairs[j].S
+	})
+	for _, pair := range pairs {
+		fmt.Println(pair.S, words[pair.I], dictionary[words[pair.I]])
+	}
+
 }
