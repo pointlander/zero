@@ -14,6 +14,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -223,6 +224,51 @@ type Entropy struct {
 	Entropy float32
 }
 
+// Genome is a genome
+type Genome struct {
+	Words   []string
+	Vectors []float64
+	Fit     float64
+}
+
+// Swap swaps two genomes
+func (g Genome) Swap(i, j int) {
+	g.Words[i], g.Words[j] = g.Words[j], g.Words[i]
+	buffer, a, b := make([]float64, Width), g.Vectors[i*Width:i*Width+Width], g.Vectors[j*Width:j*Width+Width]
+	copy(buffer, a)
+	copy(a, b)
+	copy(b, buffer)
+}
+
+// Fitness calculates the fitness of a genome
+func (g Genome) Fitness(truth []float64) float64 {
+	sum, index, length := 0.0, 0, len(g.Words)
+	for i := 0; i < length; i++ {
+		a := g.Vectors[i*Width : i*Width+Width]
+		for j := 0; j < length; j++ {
+			b := g.Vectors[j*Width : j*Width+Width]
+			total := 0.0
+			for key, value := range a {
+				total += value * b[key]
+			}
+			sum += (total - truth[index]) * (total - truth[index])
+			index++
+		}
+	}
+	return sum
+}
+
+// Copy copies a genome
+func (g Genome) Copy() Genome {
+	vectors, words := make([]float64, len(g.Vectors)), make([]string, len(g.Words))
+	copy(vectors, g.Vectors)
+	copy(words, g.Words)
+	return Genome{
+		Words:   words,
+		Vectors: vectors,
+	}
+}
+
 func main() {
 	rand.Seed(1)
 	flag.Parse()
@@ -412,5 +458,58 @@ func main() {
 	} else if *FlagPhase {
 		Phase(dictionary, words, vectors)
 		return
+	}
+
+	a, length := make([]float64, 0, 8), len(wordsEnglish)
+	v := vectors[:length]
+	for i := 0; i < length; i++ {
+		x := v[i*Width : i*Width+Width]
+		for j := 0; j < length; j++ {
+			y := v[j*Width : j*Width+Width]
+			total := 0.0
+			for key, value := range x {
+				total += value * y[key]
+			}
+			a = append(a, total)
+		}
+	}
+
+	rnd := rand.New(rand.NewSource(1))
+
+	genomes := make([]Genome, 0, 8)
+	for i := 0; i < 256; i++ {
+		v := make([]float64, len(vectors)/2)
+		copy(v, vectors[len(vectors)/2:])
+		w := make([]string, len(wordsGerman))
+		copy(w, wordsGerman)
+		genome := Genome{
+			Vectors: v,
+			Words:   w,
+		}
+		rnd.Shuffle(len(wordsGerman), func(i, j int) {
+			genome.Swap(i, j)
+		})
+		genomes = append(genomes, genome)
+	}
+
+	for i := range genomes {
+		genomes[i].Fit = genomes[i].Fitness(a)
+	}
+	size := len(genomes)
+	for g := 0; g < 512; g++ {
+		for i := 0; i < size; i++ {
+			cp := genomes[i].Copy()
+			cp.Swap(rnd.Intn(len(cp.Words)), rnd.Intn(len(cp.Words)))
+			cp.Fit = cp.Fitness(a)
+			genomes = append(genomes, cp)
+		}
+		sort.Slice(genomes, func(i, j int) bool {
+			return genomes[i].Fit < genomes[j].Fit
+		})
+		genomes = genomes[:size]
+		fmt.Println(g, genomes[0].Fit)
+	}
+	for _, word := range genomes[0].Words {
+		fmt.Println(word)
 	}
 }
