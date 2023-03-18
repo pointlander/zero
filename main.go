@@ -289,7 +289,7 @@ func simplify(rnd *rand.Rand, name string, vectors []float64) []float64 {
 			w.States[i] = make([]float32, len(w.X))
 		}
 	}
-	set.Add("inputs", Width, Length)
+	set.Add("inputs", Width, Length/4)
 	inputs := set.ByName["inputs"]
 	inputs.X = append(inputs.X, w.X...)
 	inputs.States = make([][]float32, StateTotal)
@@ -320,8 +320,7 @@ func simplify(rnd *rand.Rand, name string, vectors []float64) []float64 {
 		// Update the point weights with the partial derivatives using adam
 		b1, b2 := pow(B1), pow(B2)
 
-		for k, d := range w.D[Offset:] {
-			k += Offset
+		for k, d := range w.D {
 			g := d
 			m := B1*w.States[StateM][k] + (1-B1)*g
 			v := B2*w.States[StateV][k] + (1-B2)*g*g
@@ -331,8 +330,7 @@ func simplify(rnd *rand.Rand, name string, vectors []float64) []float64 {
 			vhat := v / (1 - b2)
 			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
 		}
-		for k, d := range inputs.D[Offset:] {
-			k += Offset
+		for k, d := range inputs.D {
 			g := d
 			m := B1*inputs.States[StateM][k] + (1-B1)*g
 			v := B2*inputs.States[StateV][k] + (1-B2)*g*g
@@ -605,12 +603,17 @@ func main() {
 		return
 	}
 
+	rnd := rand.New(rand.NewSource(1))
+	simple := false
 	a, length := make([]float64, 0, 8), len(wordsEnglish)
-	v := vectors[:length]
+	englishVectors := vectors[:len(vectors)/2]
+	if simple {
+		englishVectors = simplify(rnd, "english", englishVectors)
+	}
 	for i := 0; i < length; i++ {
-		x := v[i*Width : i*Width+Width]
+		x := englishVectors[i*Width : i*Width+Width]
 		for j := 0; j < length; j++ {
-			y := v[j*Width : j*Width+Width]
+			y := englishVectors[j*Width : j*Width+Width]
 			total := 0.0
 			for key, value := range x {
 				total += value * y[key]
@@ -619,12 +622,13 @@ func main() {
 		}
 	}
 
-	rnd := rand.New(rand.NewSource(1))
-
-	genomes := make([]Genome, 0, 8)
+	germanVectors, genomes := vectors[len(vectors)/2:], make([]Genome, 0, 8)
+	if simple {
+		germanVectors = simplify(rnd, "german", germanVectors)
+	}
 	for i := 0; i < 256; i++ {
 		v := make([]float64, len(vectors)/2)
-		copy(v, vectors[len(vectors)/2:])
+		copy(v, germanVectors)
 		w := make([]string, len(wordsGerman))
 		copy(w, wordsGerman)
 		genome := Genome{
@@ -636,7 +640,6 @@ func main() {
 		})
 		genomes = append(genomes, genome)
 	}
-
 	for i := range genomes {
 		genomes[i].Fit = genomes[i].Fitness(a)
 	}
