@@ -404,27 +404,28 @@ func (g Genome) Fitness(truth []float64) float64 {
 }
 
 // IFitness calculates the fitness of a genome using fft
-func (g Genome) IFitness(truth []float64) float64 {
+func (g Genome) IFitness(a [][]complex128) float64 {
 	sum, index, length := 0.0, 0, len(g.Words)
-	x, y := make([][]float64, length), make([][]float64, length)
+	y := make([][]float64, length)
 	for i := 0; i < length; i++ {
 		a := g.Vectors[i*Width : i*Width+Width]
-		x[i], y[i] = make([]float64, length), make([]float64, length)
+		y[i] = make([]float64, length)
 		for j := 0; j < length; j++ {
 			b := g.Vectors[j*Width : j*Width+Width]
 			total := 0.0
 			for key, value := range a {
 				total += value * b[key]
 			}
-			x[i][j], y[i][j] = truth[index], total
+			y[i][j] = total
 			index++
 		}
 	}
-	a, b := fft.FFT2Real(x), fft.FFT2Real(y)
+	b := fft.FFT2Real(y)
 	for i, aa := range a {
 		for j, aaa := range aa {
-			diff := cmplx.Phase(aaa) - cmplx.Phase(b[i][j])
-			sum += diff * diff
+			diffPhase := cmplx.Phase(aaa) - cmplx.Phase(b[i][j])
+			//diffAbs := cmplx.Abs(aaa) - cmplx.Abs(b[i][j])
+			sum += /*diffAbs*diffAbs +*/ diffPhase * diffPhase
 		}
 	}
 	return sum
@@ -634,12 +635,13 @@ func main() {
 
 	rnd := rand.New(rand.NewSource(1))
 	simple := false
-	a, length := make([]float64, 0, 8), len(wordsEnglish)
+	a, length := make([][]float64, len(wordsEnglish)), len(wordsEnglish)
 	englishVectors := vectors[:len(vectors)/2]
 	if simple {
 		englishVectors = simplify(rnd, "english", englishVectors)
 	}
 	for i := 0; i < length; i++ {
+		a[i] = make([]float64, length)
 		x := englishVectors[i*Width : i*Width+Width]
 		for j := 0; j < length; j++ {
 			y := englishVectors[j*Width : j*Width+Width]
@@ -647,9 +649,10 @@ func main() {
 			for key, value := range x {
 				total += value * y[key]
 			}
-			a = append(a, total)
+			a[i][j] = total
 		}
 	}
+	aa := fft.FFT2Real(a)
 
 	germanVectors, genomes := vectors[len(vectors)/2:], make([]Genome, 0, 8)
 	if simple {
@@ -670,14 +673,14 @@ func main() {
 		genomes = append(genomes, genome)
 	}
 	for i := range genomes {
-		genomes[i].Fit = genomes[i].IFitness(a)
+		genomes[i].Fit = genomes[i].IFitness(aa)
 	}
 	size := len(genomes)
 	for g := 0; g < 512; g++ {
 		for i := 0; i < size; i++ {
 			cp := genomes[i].Copy()
 			cp.Swap(rnd.Intn(len(cp.Words)), rnd.Intn(len(cp.Words)))
-			cp.Fit = cp.IFitness(a)
+			cp.Fit = cp.IFitness(aa)
 			genomes = append(genomes, cp)
 		}
 		sort.Slice(genomes, func(i, j int) bool {
