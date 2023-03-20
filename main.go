@@ -635,7 +635,7 @@ func main() {
 
 	rnd := rand.New(rand.NewSource(1))
 	simple := false
-	a, length := make([][]float64, len(wordsEnglish)), len(wordsEnglish)
+	flat, a, length := make([]float64, len(wordsEnglish)), make([][]float64, len(wordsEnglish)), len(wordsEnglish)
 	englishVectors := vectors[:len(vectors)/2]
 	if simple {
 		englishVectors = simplify(rnd, "english", englishVectors)
@@ -650,10 +650,11 @@ func main() {
 				total += value * y[key]
 			}
 			a[i][j] = total
+			flat = append(flat, total)
 		}
 	}
 	aa := fft.FFT2Real(a)
-
+	_ = aa
 	germanVectors, genomes := vectors[len(vectors)/2:], make([]Genome, 0, 8)
 	if simple {
 		germanVectors = simplify(rnd, "german", germanVectors)
@@ -672,15 +673,36 @@ func main() {
 		})
 		genomes = append(genomes, genome)
 	}
+	v := make([]float64, len(vectors)/2)
+	copy(v, germanVectors)
+	w := make([]string, len(wordsGerman))
+	copy(w, wordsGerman)
+	target := Genome{
+		Vectors: v,
+		Words:   w,
+	}
+	average, squared := 0.0, 0.0
 	for i := range genomes {
-		genomes[i].Fit = genomes[i].IFitness(aa)
+		fit := genomes[i].Fitness(flat)
+		genomes[i].Fit = fit
+		average += fit
+		squared += fit * fit
+	}
+	t := target.Fitness(flat)
+	fmt.Println("target=", t)
+	average /= float64(len(genomes))
+	stddev := math.Sqrt(squared/float64(len(genomes)) - average*average)
+	fmt.Println("average=", average)
+	fmt.Println("stddev=", stddev)
+	for i := range genomes {
+		genomes[i].Fit = math.Abs(genomes[i].Fit)
 	}
 	size := len(genomes)
 	for g := 0; g < 512; g++ {
 		for i := 0; i < size; i++ {
 			cp := genomes[i].Copy()
 			cp.Swap(rnd.Intn(len(cp.Words)), rnd.Intn(len(cp.Words)))
-			cp.Fit = cp.IFitness(aa)
+			cp.Fit = math.Abs(cp.Fitness(flat))
 			genomes = append(genomes, cp)
 		}
 		sort.Slice(genomes, func(i, j int) bool {
