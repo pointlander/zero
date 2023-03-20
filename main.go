@@ -635,7 +635,7 @@ func main() {
 
 	rnd := rand.New(rand.NewSource(1))
 	simple := false
-	flat, a, length := make([]float64, len(wordsEnglish)), make([][]float64, len(wordsEnglish)), len(wordsEnglish)
+	flat, a, length := make([]float64, 0, len(wordsEnglish)), make([][]float64, len(wordsEnglish)), len(wordsEnglish)
 	englishVectors := vectors[:len(vectors)/2]
 	if simple {
 		englishVectors = simplify(rnd, "english", englishVectors)
