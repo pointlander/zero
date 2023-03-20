@@ -689,6 +689,10 @@ func main() {
 		genomes = genomes[:size]
 		fmt.Println(g, genomes[0].Fit)
 	}
+	for i, word := range wordsEnglish {
+		fmt.Printf("%7s %13s\n", word, wordsGerman[i])
+	}
+	fmt.Println()
 	for _, word := range genomes[0].Words {
 		fmt.Println(word)
 	}
