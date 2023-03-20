@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/cmplx"
 	"math/rand"
 	"os"
 	"sort"
@@ -19,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mjibson/go-dsp/fft"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
@@ -401,6 +403,33 @@ func (g Genome) Fitness(truth []float64) float64 {
 	return sum
 }
 
+// IFitness calculates the fitness of a genome using fft
+func (g Genome) IFitness(truth []float64) float64 {
+	sum, index, length := 0.0, 0, len(g.Words)
+	x, y := make([][]float64, length), make([][]float64, length)
+	for i := 0; i < length; i++ {
+		a := g.Vectors[i*Width : i*Width+Width]
+		x[i], y[i] = make([]float64, length), make([]float64, length)
+		for j := 0; j < length; j++ {
+			b := g.Vectors[j*Width : j*Width+Width]
+			total := 0.0
+			for key, value := range a {
+				total += value * b[key]
+			}
+			x[i][j], y[i][j] = truth[index], total
+			index++
+		}
+	}
+	a, b := fft.FFT2Real(x), fft.FFT2Real(y)
+	for i, aa := range a {
+		for j, aaa := range aa {
+			diff := cmplx.Phase(aaa) - cmplx.Phase(b[i][j])
+			sum += diff * diff
+		}
+	}
+	return sum
+}
+
 // Copy copies a genome
 func (g Genome) Copy() Genome {
 	vectors, words := make([]float64, len(g.Vectors)), make([]string, len(g.Words))
@@ -641,14 +670,14 @@ func main() {
 		genomes = append(genomes, genome)
 	}
 	for i := range genomes {
-		genomes[i].Fit = genomes[i].Fitness(a)
+		genomes[i].Fit = genomes[i].IFitness(a)
 	}
 	size := len(genomes)
 	for g := 0; g < 512; g++ {
 		for i := 0; i < size; i++ {
 			cp := genomes[i].Copy()
 			cp.Swap(rnd.Intn(len(cp.Words)), rnd.Intn(len(cp.Words)))
-			cp.Fit = cp.Fitness(a)
+			cp.Fit = cp.IFitness(a)
 			genomes = append(genomes, cp)
 		}
 		sort.Slice(genomes, func(i, j int) bool {

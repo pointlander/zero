@@ -45,6 +45,8 @@ github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMyw
 github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/jung-kurt/gofpdf v1.0.0/go.mod h1:7Id9E/uU8ce6rXgefFLlgrJj/GYY22cpxn+r32jIOes=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
+github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12 h1:dd7vnTDfjtwCETZDrRe+GPYNLA1jBtbZeyfyE8eZCyk=
+github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12/go.mod h1:i/KKcxEWEO8Yyl11DYafRPKOPVYTrhxiTRigjtEEXZU=
 github.com/muesli/clusters v0.0.0-20180605185049-a07a36e67d36/go.mod h1:mw5KDqUj0eLj/6DUNINLVJNoPTFkEuGMHtJsXLviLkY=
 github.com/muesli/clusters v0.0.0-20200529215643-2700303c1762 h1:p4A2Jx7Lm3NV98VRMKlyWd3nqf8obft8NfXlAUmqd3I=
 github.com/muesli/clusters v0.0.0-20200529215643-2700303c1762/go.mod h1:mw5KDqUj0eLj/6DUNINLVJNoPTFkEuGMHtJsXLviLkY=
