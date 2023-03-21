@@ -243,6 +243,34 @@ func (g Genome) Swap(i, j int) {
 	copy(b, buffer)
 }
 
+// Move moves a genomes
+func (g Genome) Move(i, j int) {
+	words, vectors := make([]string, 0, len(g.Words)), make([]float64, 0, len(g.Vectors))
+	a, b := g.Words[i], g.Vectors[i*Width:i*Width+Width]
+	for x, value := range g.Words {
+		if x == i {
+			continue
+		} else if x == j {
+			words = append(words, a)
+		} else {
+			words = append(words, value)
+		}
+	}
+	index := 0
+	for x := 0; x < len(g.Vectors); x += Width {
+		if index == i {
+			index++
+			continue
+		} else if index == j {
+			vectors = append(vectors, b...)
+			index++
+		} else {
+			vectors = append(vectors, g.Vectors[index*Width:index*Width+Width]...)
+			index++
+		}
+	}
+}
+
 func simplify(rnd *rand.Rand, name string, vectors []float64) []float64 {
 	debug, err := os.Create(fmt.Sprintf("%s_output.txt", name))
 	if err != nil {
@@ -390,13 +418,31 @@ func (g Genome) Fitness(truth []float64) float64 {
 	sum, index, length := 0.0, 0, len(g.Words)
 	for i := 0; i < length; i++ {
 		a := g.Vectors[i*Width : i*Width+Width]
+		type Link struct {
+			Index int
+			Value float64
+		}
+		links := make([]Link, length)
 		for j := 0; j < length; j++ {
 			b := g.Vectors[j*Width : j*Width+Width]
 			total := 0.0
 			for key, value := range a {
 				total += value * b[key]
 			}
-			sum += (total - truth[index]) * (total - truth[index])
+			links[j].Index = j
+			links[j].Value = total
+		}
+		sort.Slice(links, func(i, j int) bool {
+			return math.Abs(links[i].Value) > math.Abs(links[j].Value)
+		})
+		valid := make(map[int]float64)
+		for _, value := range links[:2] {
+			valid[value.Index] = value.Value
+		}
+		for j := 0; j < length; j++ {
+			if value, ok := valid[j]; ok {
+				sum += (value - truth[index]) * (value - truth[index])
+			}
 			index++
 		}
 	}
@@ -698,7 +744,7 @@ func main() {
 		genomes[i].Fit = math.Abs(genomes[i].Fit)
 	}
 	size := len(genomes)
-	for g := 0; g < 512; g++ {
+	for g := 0; g < 1024; g++ {
 		for i := 0; i < size; i++ {
 			cp := genomes[i].Copy()
 			cp.Swap(rnd.Intn(len(cp.Words)), rnd.Intn(len(cp.Words)))
