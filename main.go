@@ -464,4 +464,36 @@ func main() {
 	matchWord(0)
 	matchWord(12)
 	matchWord(27)
+
+	type Cost struct {
+		Index int
+		Value float64
+	}
+	brute := func(w int) {
+		costs := make([]Cost, 0, 8)
+		eng := match(w, englishVectors)
+		fmt.Println(wordsEnglish[w], wordsGerman[w])
+		for i := 0; i < length; i++ {
+			deu := match(i, germanVectors)
+			cost := 0.0
+			for j, value := range deu {
+				diff := value.Value - eng[j].Value
+				cost += diff * diff
+			}
+			costs = append(costs, Cost{
+				Index: i,
+				Value: cost,
+			})
+		}
+		sort.Slice(costs, func(i, j int) bool {
+			return costs[i].Value > costs[j].Value
+		})
+		for _, value := range costs {
+			fmt.Println(value.Index, wordsEnglish[value.Index], wordsGerman[value.Index], value.Value)
+		}
+		fmt.Println()
+	}
+	brute(0)
+	brute(12)
+	brute(27)
 }
