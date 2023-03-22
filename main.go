@@ -429,31 +429,31 @@ func main() {
 		Value float64
 	}
 
+	match := func(w int, vectors []float64) []Match {
+		matches := make([]Match, 0, 8)
+		for i := 0; i < length; i++ {
+			if i == w {
+				continue
+			}
+			sum := 0.0
+			for j := 0; j < Width; j++ {
+				sum += vectors[w*Width+j] * vectors[i*Width+j]
+			}
+			matches = append(matches, Match{
+				Index: i,
+				Value: sum,
+			})
+		}
+		sort.Slice(matches, func(i, j int) bool {
+			return matches[i].Value > matches[j].Value
+		})
+		return matches
+	}
 	matchWord := func(w int) {
 		fmt.Println(wordsEnglish[w], wordsGerman[w])
-		match := func(vectors []float64) []Match {
-			matches := make([]Match, 0, 8)
-			for i := 0; i < length; i++ {
-				if i == w {
-					continue
-				}
-				sum := 0.0
-				for j := 0; j < Width; j++ {
-					sum += vectors[w*Width+j] * vectors[i*Width+j]
-				}
-				matches = append(matches, Match{
-					Index: i,
-					Value: sum,
-				})
-			}
-			sort.Slice(matches, func(i, j int) bool {
-				return matches[i].Value > matches[j].Value
-			})
-			return matches
-		}
 
-		matchesEnglish := match(englishVectors)
-		matchesGerman := match(germanVectors)
+		matchesEnglish := match(w, englishVectors)
+		matchesGerman := match(w, germanVectors)
 		for i, match := range matchesEnglish {
 			matchGerman := matchesGerman[i]
 			fmt.Println(wordsEnglish[match.Index], wordsGerman[matchGerman.Index], matchGerman.Value, match.Value)
