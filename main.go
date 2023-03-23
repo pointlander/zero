@@ -265,7 +265,7 @@ func se(rnd *rand.Rand, name string, Q, K, V []float64) []float64 {
 	_ = dropout
 
 	set := tf32.NewSet()
-	set.Add("q", Width, Length/2)
+	set.Add("q", Width, Length/4)
 	q := set.ByName["q"]
 	for _, value := range Q {
 		q.X = append(q.X, float32(value))
@@ -275,7 +275,7 @@ func se(rnd *rand.Rand, name string, Q, K, V []float64) []float64 {
 		q.States[i] = make([]float32, len(q.X))
 	}
 
-	set.Add("k", Width, Length/2)
+	set.Add("k", Width, Length/4)
 	k := set.ByName["k"]
 	for _, value := range K {
 		k.X = append(k.X, float32(value))
@@ -285,7 +285,7 @@ func se(rnd *rand.Rand, name string, Q, K, V []float64) []float64 {
 		k.States[i] = make([]float32, len(k.X))
 	}
 
-	set.Add("v", Width, Length/2)
+	set.Add("v", Width, Length/4)
 	v := set.ByName["v"]
 	for _, value := range V {
 		v.X = append(v.X, float32(value))
@@ -583,5 +583,18 @@ func main() {
 		return
 	} else if *FlagBrute {
 		Brute(dictionary, wordsEnglish, wordsGerman, words, vectors)
+	}
+
+	rnd := rand.New(rand.NewSource(1))
+
+	//length := len(wordsEnglish)
+	englishVectors := vectors[:len(vectors)/2]
+	germanVectors := vectors[len(vectors)/2:]
+
+	entropyEnglish := se(rnd, "entropy_english", germanVectors, germanVectors, englishVectors)
+	entropyGerman := se(rnd, "german_english", englishVectors, englishVectors, germanVectors)
+
+	for i, value := range entropyEnglish {
+		fmt.Println(entropyGerman[i], value)
 	}
 }
