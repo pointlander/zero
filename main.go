@@ -227,7 +227,7 @@ type Entropy struct {
 	Entropy float32
 }
 
-func se(rnd *rand.Rand, name string, Q, K, V []float64) []float64 {
+func se(rnd *rand.Rand, name string, Q, K, V []float64) ([]float64, []float64) {
 	debug, err := os.Create(fmt.Sprintf("%s_output.txt", name))
 	if err != nil {
 		panic(err)
@@ -297,7 +297,8 @@ func se(rnd *rand.Rand, name string, Q, K, V []float64) []float64 {
 
 	spherical := tf32.U(SphericalSoftmaxReal)
 	l1 := spherical(tf32.Mul(set.Get("q"), set.Get("k")))
-	l2 := spherical(tf32.Mul(tf32.T(set.Get("v")), l1))
+	l2a := tf32.Mul(tf32.T(set.Get("v")), l1)
+	l2 := spherical(l2a)
 	cost := tf32.Entropy(l2)
 
 	/*spherical := tf32.U(SphericalSoftmaxReal)
@@ -379,14 +380,22 @@ func se(rnd *rand.Rand, name string, Q, K, V []float64) []float64 {
 		output[key] = float64(value)
 	}*/
 
-	output := make([]float64, 0, 8)
+	e := make([]float64, 0, 8)
 	cost(func(a *tf32.V) bool {
 		for _, value := range a.X {
-			output = append(output, float64(value))
+			e = append(e, float64(value))
 		}
 		return true
 	})
-	return output
+
+	vec := make([]float64, 0, 8)
+	l2(func(a *tf32.V) bool {
+		for _, value := range a.X {
+			vec = append(vec, float64(value))
+		}
+		return true
+	})
+	return e, vec
 }
 
 func main() {
@@ -583,18 +592,50 @@ func main() {
 		return
 	} else if *FlagBrute {
 		Brute(dictionary, wordsEnglish, wordsGerman, words, vectors)
+		return
 	}
 
 	rnd := rand.New(rand.NewSource(1))
 
-	//length := len(wordsEnglish)
+	length := len(wordsEnglish)
 	englishVectors := vectors[:len(vectors)/2]
 	germanVectors := vectors[len(vectors)/2:]
 
-	entropyEnglish := se(rnd, "entropy_english", germanVectors, germanVectors, englishVectors)
-	entropyGerman := se(rnd, "german_english", englishVectors, englishVectors, germanVectors)
+	entropyEnglish, x := se(rnd, "entropy_english", germanVectors, germanVectors, englishVectors)
+	entropyGerman, y := se(rnd, "german_english", englishVectors, englishVectors, germanVectors)
 
 	for i, value := range entropyEnglish {
 		fmt.Println(entropyGerman[i], value)
+	}
+
+	for i := 0; i < Length/4; i++ {
+		sum := 0.0
+		for j := 0; j < Width; j++ {
+			a := x[i*Width+j]
+			sum += a * a
+		}
+		length := math.Sqrt(sum)
+		for j := 0; j < Width; j++ {
+			x[i*Width+j] /= length
+		}
+	}
+	for i := 0; i < Length/4; i++ {
+		sum := 0.0
+		for j := 0; j < Width; j++ {
+			a := y[i*Width+j]
+			sum += a * a
+		}
+		length := math.Sqrt(sum)
+		for j := 0; j < Width; j++ {
+			y[i*Width+j] /= length
+		}
+	}
+
+	for i := 0; i < length; i++ {
+		sum := 0.0
+		for j := 0; j < Width; j++ {
+			sum += math.Sqrt(x[j]*x[j] + y[i*Width+j]*y[i*Width+j])
+		}
+		fmt.Println(sum)
 	}
 }
