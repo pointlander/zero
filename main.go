@@ -14,6 +14,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -631,11 +632,26 @@ func main() {
 		}
 	}
 
+	type Rank struct {
+		Index int
+		Value float64
+	}
+	ranks := make([]Rank, 0, 8)
 	for i := 0; i < length; i++ {
 		sum := 0.0
 		for j := 0; j < Width; j++ {
-			sum += math.Sqrt(x[j]*x[j] + y[i*Width+j]*y[i*Width+j])
+			diff := y[i*Width+j] - x[j]
+			sum += diff * diff
 		}
-		fmt.Println(sum)
+		ranks = append(ranks, Rank{
+			Index: i,
+			Value: math.Sqrt(sum),
+		})
+	}
+	sort.Slice(ranks, func(i, j int) bool {
+		return ranks[i].Value > ranks[j].Value
+	})
+	for _, value := range ranks {
+		fmt.Println(value.Index, value.Value)
 	}
 }
