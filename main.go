@@ -14,10 +14,8 @@ import (
 	"math"
 	"math/rand"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
@@ -219,6 +217,8 @@ var (
 	FlagPhase = flag.Bool("phase", false, "complex phase mode")
 	// FlagGenetic genetic algorithm mode
 	FlagGenetic = flag.Bool("genetic", false, "genetic mode")
+	// FlagBrute brute force mode
+	FlagBrute = flag.Bool("brute", false, "brute force mode")
 )
 
 // Entropy is the output self entropy of the model
@@ -227,7 +227,7 @@ type Entropy struct {
 	Entropy float32
 }
 
-func compress(rnd *rand.Rand, name string, vectors []float64) []float64 {
+func se(rnd *rand.Rand, name string, Q, K, V []float64) []float64 {
 	debug, err := os.Create(fmt.Sprintf("%s_output.txt", name))
 	if err != nil {
 		panic(err)
@@ -262,28 +262,45 @@ func compress(rnd *rand.Rand, name string, vectors []float64) []float64 {
 		}
 		return false
 	})
+	_ = dropout
 
 	set := tf32.NewSet()
-	set.Add("words", Width, Length/2)
-	w := set.ByName["words"]
-	for _, w := range set.Weights {
-		for _, value := range vectors {
-			w.X = append(w.X, float32(value))
-		}
-		w.States = make([][]float32, StateTotal)
-		for i := range w.States {
-			w.States[i] = make([]float32, len(w.X))
-		}
+	set.Add("q", Width, Length/2)
+	q := set.ByName["q"]
+	for _, value := range Q {
+		q.X = append(q.X, float32(value))
 	}
-	set.Add("inputs", Width, Length/2)
-	inputs := set.ByName["inputs"]
-	inputs.X = append(inputs.X, w.X...)
-	inputs.States = make([][]float32, StateTotal)
-	for i := range inputs.States {
-		inputs.States[i] = make([]float32, len(inputs.X))
+	q.States = make([][]float32, StateTotal)
+	for i := range q.States {
+		q.States[i] = make([]float32, len(q.X))
+	}
+
+	set.Add("k", Width, Length/2)
+	k := set.ByName["k"]
+	for _, value := range K {
+		k.X = append(k.X, float32(value))
+	}
+	k.States = make([][]float32, StateTotal)
+	for i := range k.States {
+		k.States[i] = make([]float32, len(k.X))
+	}
+
+	set.Add("v", Width, Length/2)
+	v := set.ByName["v"]
+	for _, value := range V {
+		v.X = append(v.X, float32(value))
+	}
+	v.States = make([][]float32, StateTotal)
+	for i := range v.States {
+		v.States[i] = make([]float32, len(v.X))
 	}
 
 	spherical := tf32.U(SphericalSoftmaxReal)
+	l1 := spherical(tf32.Mul(set.Get("q"), set.Get("k")))
+	l2 := spherical(tf32.Mul(tf32.T(set.Get("v")), l1))
+	cost := tf32.Entropy(l2)
+
+	/*spherical := tf32.U(SphericalSoftmaxReal)
 	l1 := dropout(spherical(tf32.Mul(set.Get("words"), set.Get("inputs"))))
 	l2 := spherical(tf32.Mul(tf32.T(set.Get("words")), l1))
 	cost := tf32.Avg(tf32.Entropy(l2))
@@ -297,13 +314,10 @@ func compress(rnd *rand.Rand, name string, vectors []float64) []float64 {
 		return float32(y)
 	}
 	points := make(plotter.XYs, 0, 8)
-	// The stochastic gradient descent loop
 	for i < Epochs+1 {
 		start := time.Now()
-		// Calculate the gradients
 		total := tf32.Gradient(cost).X[0]
 
-		// Update the point weights with the partial derivatives using adam
 		b1, b2 := pow(B1), pow(B2)
 
 		for k, d := range w.D {
@@ -316,7 +330,7 @@ func compress(rnd *rand.Rand, name string, vectors []float64) []float64 {
 			vhat := v / (1 - b2)
 			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
 		}
-		/*for k, d := range inputs.D {
+		for k, d := range inputs.D {
 			g := d
 			m := B1*inputs.States[StateM][k] + (1-B1)*g
 			v := B2*inputs.States[StateV][k] + (1-B2)*g*g
@@ -326,9 +340,8 @@ func compress(rnd *rand.Rand, name string, vectors []float64) []float64 {
 			vhat := v / (1 - b2)
 			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
 		}
-		copy(inputs.X, w.X)*/
+		copy(inputs.X, w.X)
 
-		// Housekeeping
 		end := time.Since(start)
 		fmt.Fprintln(debug, i, total, end)
 		set.Zero()
@@ -342,7 +355,6 @@ func compress(rnd *rand.Rand, name string, vectors []float64) []float64 {
 		i++
 	}
 
-	// Plot the cost
 	p := plot.New()
 
 	p.Title.Text = "epochs vs cost"
@@ -365,7 +377,15 @@ func compress(rnd *rand.Rand, name string, vectors []float64) []float64 {
 	output := make([]float64, len(w.X))
 	for key, value := range w.X {
 		output[key] = float64(value)
-	}
+	}*/
+
+	output := make([]float64, 0, 8)
+	cost(func(a *tf32.V) bool {
+		for _, value := range a.X {
+			output = append(output, float64(value))
+		}
+		return true
+	})
 	return output
 }
 
@@ -561,105 +581,7 @@ func main() {
 	} else if *FlagGenetic {
 		Genetic(dictionary, wordsEnglish, wordsGerman, words, vectors)
 		return
+	} else if *FlagBrute {
+		Brute(dictionary, wordsEnglish, wordsGerman, words, vectors)
 	}
-
-	rnd := rand.New(rand.NewSource(1))
-	vectors = compress(rnd, "vectors", vectors)
-
-	for i := 0; i < Length/2; i++ {
-		sum := 0.0
-		for j := 0; j < Width; j++ {
-			a := vectors[i*Width+j]
-			sum += a * a
-		}
-		length := math.Sqrt(sum)
-		for j := 0; j < Width; j++ {
-			vectors[i*Width+j] /= length
-		}
-	}
-
-	length := len(wordsEnglish)
-	englishVectors := vectors[:len(vectors)/2]
-	germanVectors := vectors[len(vectors)/2:]
-
-	type Match struct {
-		Index int
-		Value float64
-	}
-
-	match := func(w int, vectors []float64) []Match {
-		matches := make([]Match, 0, 8)
-		for i := 0; i < length; i++ {
-			if i == w {
-				continue
-			}
-			sum := 0.0
-			for j := 0; j < Width; j++ {
-				sum += vectors[w*Width+j] * vectors[i*Width+j]
-			}
-			matches = append(matches, Match{
-				Index: i,
-				Value: sum,
-			})
-		}
-		values, sum := make([]float64, len(matches)), 0.0
-		for j, ax := range matches {
-			values[j] = ax.Value * ax.Value
-			sum += values[j]
-		}
-		for j, cx := range values {
-			matches[j].Value = cx / sum
-		}
-		sort.Slice(matches, func(i, j int) bool {
-			return matches[i].Value > matches[j].Value
-		})
-		return matches
-	}
-	matchWord := func(w int) {
-		fmt.Println(wordsEnglish[w], wordsGerman[w])
-
-		matchesEnglish := match(w, englishVectors)
-		matchesGerman := match(w, germanVectors)
-		for i, match := range matchesEnglish {
-			matchGerman := matchesGerman[i]
-			fmt.Println(wordsEnglish[match.Index], wordsGerman[matchGerman.Index], matchGerman.Value, match.Value)
-		}
-		fmt.Println()
-	}
-
-	matchWord(0)
-	matchWord(12)
-	matchWord(27)
-
-	type Cost struct {
-		Index int
-		Value float64
-	}
-	brute := func(w int) {
-		costs := make([]Cost, 0, 8)
-		eng := match(w, englishVectors)
-		fmt.Println(wordsEnglish[w], wordsGerman[w])
-		for i := 0; i < length; i++ {
-			deu := match(i, germanVectors)
-			cost := 0.0
-			for j, value := range deu {
-				diff := value.Value - eng[j].Value
-				cost += diff * diff
-			}
-			costs = append(costs, Cost{
-				Index: i,
-				Value: cost,
-			})
-		}
-		sort.Slice(costs, func(i, j int) bool {
-			return costs[i].Value > costs[j].Value
-		})
-		for _, value := range costs {
-			fmt.Println(value.Index, wordsEnglish[value.Index], wordsGerman[value.Index], value.Value)
-		}
-		fmt.Println()
-	}
-	brute(0)
-	brute(12)
-	brute(27)
 }
