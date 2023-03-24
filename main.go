@@ -312,31 +312,21 @@ func se(gradient bool, rnd *rand.Rand, name string, Q, K, V []float64) ([]float6
 			return float32(y)
 		}
 		points := make(plotter.XYs, 0, 8)
-		for i < Epochs+1 {
+		for i < 8*64+1 {
 			start := time.Now()
 			total := tf32.Gradient(cost).X[0]
 
 			b1, b2 := pow(B1), pow(B2)
 
-			for j, d := range q.D {
+			for j, d := range v.D {
 				g := d
-				m := B1*q.States[StateM][j] + (1-B1)*g
-				v := B2*q.States[StateV][j] + (1-B2)*g*g
-				q.States[StateM][j] = m
-				q.States[StateV][j] = v
+				m := B1*v.States[StateM][j] + (1-B1)*g
+				vv := B2*v.States[StateV][j] + (1-B2)*g*g
+				v.States[StateM][j] = m
+				v.States[StateV][j] = vv
 				mhat := m / (1 - b1)
-				vhat := v / (1 - b2)
-				q.X[j] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
-			}
-			for j, d := range k.D {
-				g := d
-				m := B1*k.States[StateM][j] + (1-B1)*g
-				v := B2*k.States[StateV][j] + (1-B2)*g*g
-				k.States[StateM][j] = m
-				k.States[StateV][j] = v
-				mhat := m / (1 - b1)
-				vhat := v / (1 - b2)
-				k.X[j] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
+				vhat := vv / (1 - b2)
+				v.X[j] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
 			}
 
 			end := time.Since(start)
@@ -597,7 +587,7 @@ func main() {
 	englishVectors := vectors[:len(vectors)/2]
 	germanVectors := vectors[len(vectors)/2:]
 
-	entropyEnglish, x := se(false, rnd, "entropy_english", englishVectors, englishVectors, englishVectors)
+	entropyEnglish, x := se(false, rnd, "english_english", englishVectors, englishVectors, englishVectors)
 	entropyGerman, y := se(false, rnd, "german_english", englishVectors, englishVectors, germanVectors)
 
 	for i, value := range entropyEnglish {
