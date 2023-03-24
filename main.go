@@ -623,7 +623,7 @@ func main() {
 			}
 			ranks = append(ranks, Rank{
 				Index: i,
-				Value: math.Sqrt(sum),
+				Value: sum,
 			})
 		}
 		sort.Slice(ranks, func(i, j int) bool {
