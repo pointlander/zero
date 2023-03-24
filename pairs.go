@@ -15,6 +15,7 @@ type Pair struct {
 	English string
 }
 
+// https://strommeninc.com/1000-most-common-german-words-frequency-vocabulary/
 var data string = `1 	wie 	as
 2 	ich 	I
 3 	seine 	his
@@ -1016,7 +1017,7 @@ var data string = `1 	wie 	as
 999 	Anspruch 	claim
 1000 	Kontinent 	continent`
 
-// Pairs is a list of word pairs
+// Pairs is a list of word pairshttps://strommeninc.com/1000-most-common-german-words-frequency-vocabulary/
 var Pairs = []Pair{}
 
 func init() {
