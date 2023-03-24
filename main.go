@@ -398,7 +398,7 @@ func main() {
 
 	vectors := []float64{}
 	_, err := os.Stat("vectors.gob")
-	wordsEnglish := []string{
+	/*wordsEnglish := []string{
 		"dog",
 		"cat",
 		"bird",
@@ -479,7 +479,9 @@ func main() {
 		"bett",
 		"tisch",
 		"kommode",
-	}
+	}*/
+	wordsEnglish := []string{}
+	wordsGerman := []string{}
 	dictionary := make(map[string]string)
 	/*for i, english := range wordsEnglish[:Words] {
 		german := wordsGerman[i]
@@ -493,10 +495,12 @@ func main() {
 	words := make([]string, 0, len(wordsEnglish)+len(wordsGerman))
 	//words = append(words, wordsEnglish[:Words]...)
 	for _, pair := range Pairs {
+		wordsEnglish = append(wordsEnglish, pair.English)
 		words = append(words, pair.English)
 	}
 	//words = append(words, wordsGerman[:Words]...)
 	for _, pair := range Pairs {
+		wordsGerman = append(wordsGerman, pair.German)
 		words = append(words, pair.German)
 	}
 	if err != nil {
@@ -609,6 +613,7 @@ func main() {
 	rnd := rand.New(rand.NewSource(1))
 
 	length := len(wordsEnglish)
+	fmt.Println("length=", length)
 	englishVectors := vectors[:len(vectors)/2]
 	germanVectors := vectors[len(vectors)/2:]
 
