@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
@@ -228,7 +229,7 @@ type Entropy struct {
 	Entropy float32
 }
 
-func se(rnd *rand.Rand, name string, Q, K, V []float64) ([]float64, []float64) {
+func se(gradient bool, rnd *rand.Rand, name string, Q, K, V []float64) ([]float64, []float64) {
 	debug, err := os.Create(fmt.Sprintf("%s_output.txt", name))
 	if err != nil {
 		panic(err)
@@ -297,89 +298,83 @@ func se(rnd *rand.Rand, name string, Q, K, V []float64) ([]float64, []float64) {
 	}
 
 	spherical := tf32.U(SphericalSoftmaxReal)
-	l1 := spherical(tf32.Mul(set.Get("q"), set.Get("k")))
-	l2a := tf32.Mul(tf32.T(set.Get("v")), l1)
-	l2 := spherical(l2a)
-	cost := tf32.Entropy(l2)
-
-	/*spherical := tf32.U(SphericalSoftmaxReal)
-	l1 := dropout(spherical(tf32.Mul(set.Get("words"), set.Get("inputs"))))
-	l2 := spherical(tf32.Mul(tf32.T(set.Get("words")), l1))
+	l1 := dropout(spherical(tf32.Mul(set.Get("q"), set.Get("k"))))
+	l2 := spherical(tf32.Mul(tf32.T(set.Get("v")), l1))
 	cost := tf32.Avg(tf32.Entropy(l2))
 
-	i := 1
-	pow := func(x float32) float32 {
-		y := math.Pow(float64(x), float64(i))
-		if math.IsNaN(y) || math.IsInf(y, 0) {
-			return 0
+	if gradient {
+		i := 1
+		pow := func(x float32) float32 {
+			y := math.Pow(float64(x), float64(i))
+			if math.IsNaN(y) || math.IsInf(y, 0) {
+				return 0
+			}
+			return float32(y)
 		}
-		return float32(y)
-	}
-	points := make(plotter.XYs, 0, 8)
-	for i < Epochs+1 {
-		start := time.Now()
-		total := tf32.Gradient(cost).X[0]
+		points := make(plotter.XYs, 0, 8)
+		for i < Epochs+1 {
+			start := time.Now()
+			total := tf32.Gradient(cost).X[0]
 
-		b1, b2 := pow(B1), pow(B2)
+			b1, b2 := pow(B1), pow(B2)
 
-		for k, d := range w.D {
-			g := d
-			m := B1*w.States[StateM][k] + (1-B1)*g
-			v := B2*w.States[StateV][k] + (1-B2)*g*g
-			w.States[StateM][k] = m
-			w.States[StateV][k] = v
-			mhat := m / (1 - b1)
-			vhat := v / (1 - b2)
-			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
+			for j, d := range q.D {
+				g := d
+				m := B1*q.States[StateM][j] + (1-B1)*g
+				v := B2*q.States[StateV][j] + (1-B2)*g*g
+				q.States[StateM][j] = m
+				q.States[StateV][j] = v
+				mhat := m / (1 - b1)
+				vhat := v / (1 - b2)
+				q.X[j] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
+			}
+			for j, d := range k.D {
+				g := d
+				m := B1*k.States[StateM][j] + (1-B1)*g
+				v := B2*k.States[StateV][j] + (1-B2)*g*g
+				k.States[StateM][j] = m
+				k.States[StateV][j] = v
+				mhat := m / (1 - b1)
+				vhat := v / (1 - b2)
+				k.X[j] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
+			}
+
+			end := time.Since(start)
+			fmt.Fprintln(debug, i, total, end)
+			set.Zero()
+
+			if math.IsNaN(float64(total)) {
+				fmt.Println(total)
+				break
+			}
+
+			points = append(points, plotter.XY{X: float64(i), Y: float64(total)})
+			i++
 		}
-		for k, d := range inputs.D {
-			g := d
-			m := B1*inputs.States[StateM][k] + (1-B1)*g
-			v := B2*inputs.States[StateV][k] + (1-B2)*g*g
-			inputs.States[StateM][k] = m
-			inputs.States[StateV][k] = v
-			mhat := m / (1 - b1)
-			vhat := v / (1 - b2)
-			w.X[k] -= Eta * mhat / (float32(math.Sqrt(float64(vhat))) + 1e-8)
+
+		p := plot.New()
+
+		p.Title.Text = "epochs vs cost"
+		p.X.Label.Text = "epochs"
+		p.Y.Label.Text = "cost"
+
+		scatter, err := plotter.NewScatter(points)
+		if err != nil {
+			panic(err)
 		}
-		copy(inputs.X, w.X)
+		scatter.GlyphStyle.Radius = vg.Length(1)
+		scatter.GlyphStyle.Shape = draw.CircleGlyph{}
+		p.Add(scatter)
 
-		end := time.Since(start)
-		fmt.Fprintln(debug, i, total, end)
-		set.Zero()
-
-		if math.IsNaN(float64(total)) {
-			fmt.Println(total)
-			break
+		err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%s_cost.png", name))
+		if err != nil {
+			panic(err)
 		}
-
-		points = append(points, plotter.XY{X: float64(i), Y: float64(total)})
-		i++
 	}
 
-	p := plot.New()
-
-	p.Title.Text = "epochs vs cost"
-	p.X.Label.Text = "epochs"
-	p.Y.Label.Text = "cost"
-
-	scatter, err := plotter.NewScatter(points)
-	if err != nil {
-		panic(err)
-	}
-	scatter.GlyphStyle.Radius = vg.Length(1)
-	scatter.GlyphStyle.Shape = draw.CircleGlyph{}
-	p.Add(scatter)
-
-	err = p.Save(8*vg.Inch, 8*vg.Inch, fmt.Sprintf("%s_cost.png", name))
-	if err != nil {
-		panic(err)
-	}
-
-	output := make([]float64, len(w.X))
-	for key, value := range w.X {
-		output[key] = float64(value)
-	}*/
+	l1 = spherical(tf32.Mul(set.Get("q"), set.Get("k")))
+	l2 = spherical(tf32.Mul(tf32.T(set.Get("v")), l1))
+	cost = tf32.Entropy(l2)
 
 	e := make([]float64, 0, 8)
 	cost(func(a *tf32.V) bool {
@@ -602,8 +597,8 @@ func main() {
 	englishVectors := vectors[:len(vectors)/2]
 	germanVectors := vectors[len(vectors)/2:]
 
-	entropyEnglish, x := se(rnd, "entropy_english", englishVectors, englishVectors, englishVectors)
-	entropyGerman, y := se(rnd, "german_english", englishVectors, englishVectors, germanVectors)
+	entropyEnglish, x := se(false, rnd, "entropy_english", englishVectors, englishVectors, englishVectors)
+	entropyGerman, y := se(false, rnd, "german_english", englishVectors, englishVectors, germanVectors)
 
 	for i, value := range entropyEnglish {
 		fmt.Println(entropyGerman[i], value)
