@@ -64,7 +64,7 @@ const (
 	// 32
 	// x 3.375
 	// y 3.5
-	Length = 128
+	Length = 4 * 993 //128
 	// Offset is the offset for the parameters to learn
 	Offset = Width * Length / 2
 	// Words is the number of words per language
@@ -481,19 +481,44 @@ func main() {
 		"kommode",
 	}
 	dictionary := make(map[string]string)
-	for i, english := range wordsEnglish[:Words] {
+	/*for i, english := range wordsEnglish[:Words] {
 		german := wordsGerman[i]
 		dictionary[english] = german
 		dictionary[german] = english
+	}*/
+	for _, pair := range Pairs {
+		dictionary[pair.English] = pair.German
+		dictionary[pair.German] = pair.English
 	}
 	words := make([]string, 0, len(wordsEnglish)+len(wordsGerman))
-	words = append(words, wordsEnglish[:Words]...)
-	words = append(words, wordsGerman[:Words]...)
+	//words = append(words, wordsEnglish[:Words]...)
+	for _, pair := range Pairs {
+		words = append(words, pair.English)
+	}
+	//words = append(words, wordsGerman[:Words]...)
+	for _, pair := range Pairs {
+		words = append(words, pair.German)
+	}
 	if err != nil {
 		english := NewVectors("cc.en.300.vec.gz")
 		german := NewVectors("cc.de.300.vec.gz")
 
-		for _, word := range wordsEnglish[:Words] {
+		for _, pair := range Pairs {
+			vector := english.Dictionary[pair.English]
+			if len(vector.Vector) == 0 {
+				panic(pair.English)
+			}
+			vectors = append(vectors, vector.Vector...)
+		}
+		for _, pair := range Pairs {
+			vector := german.Dictionary[pair.German]
+			if len(vector.Vector) == 0 {
+				panic(pair.German)
+			}
+			vectors = append(vectors, vector.Vector...)
+		}
+
+		/*for _, word := range wordsEnglish[:Words] {
 			vector := english.Dictionary[word]
 			if len(vector.Vector) == 0 {
 				panic(word)
@@ -506,7 +531,7 @@ func main() {
 				panic(word)
 			}
 			vectors = append(vectors, vector.Vector...)
-		}
+		}*/
 		output, err := os.Create("vectors.gob")
 		if err != nil {
 			panic(err)

@@ -1031,8 +1031,8 @@ func init() {
 			continue
 		}
 		Pairs = append(Pairs, Pair{
-			German:  words[1],
-			English: words[2],
+			German:  strings.ToLower(strings.TrimSpace(words[1])),
+			English: strings.ToLower(strings.TrimSpace(words[2])),
 		})
 	}
 	fmt.Println("number of word pairs is", len(Pairs))
