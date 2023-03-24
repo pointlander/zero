@@ -652,15 +652,23 @@ func main() {
 		}
 		return correctness
 	}
-	correctness := 0
+	sum, sumSquared := 0, 0
 	for i := 0; i < length; i++ {
-		correctness += test(x, y, i)
+		v := test(x, y, i)
+		sum += v
+		sumSquared += v * v
 	}
-	fmt.Println("correctness english", float64(correctness)/float64(length))
+	average := float64(sum) / float64(length)
+	stddev := math.Sqrt(float64(sumSquared)/float64(length) - average*average)
+	fmt.Println("correctness english", average, stddev)
 
-	correctness = 0
+	sum, sumSquared = 0, 0
 	for i := 0; i < length; i++ {
-		correctness += test(y, x, i)
+		v := test(y, x, i)
+		sum += v
+		sumSquared += v * v
 	}
-	fmt.Println("correctness german", float64(correctness)/float64(length))
+	average = float64(sum) / float64(length)
+	stddev = math.Sqrt(float64(sumSquared)/float64(length) - average*average)
+	fmt.Println("correctness german", average, stddev)
 }
