@@ -630,7 +630,7 @@ func main() {
 			return ranks[i].Value > ranks[j].Value
 		})
 		for i, value := range ranks {
-			if value.Index == i {
+			if value.Index == t {
 				correctness = i
 				break
 			}
