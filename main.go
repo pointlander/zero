@@ -609,49 +609,37 @@ func main() {
 		fmt.Println(entropyGerman[i], value)
 	}
 
-	for i := 0; i < Length/4; i++ {
-		sum := 0.0
-		for j := 0; j < Width; j++ {
-			a := x[i*Width+j]
-			sum += a * a
-		}
-		length := math.Sqrt(sum)
-		for j := 0; j < Width; j++ {
-			x[i*Width+j] /= length
-		}
-	}
-	for i := 0; i < Length/4; i++ {
-		sum := 0.0
-		for j := 0; j < Width; j++ {
-			a := y[i*Width+j]
-			sum += a * a
-		}
-		length := math.Sqrt(sum)
-		for j := 0; j < Width; j++ {
-			y[i*Width+j] /= length
-		}
-	}
-
 	type Rank struct {
 		Index int
 		Value float64
 	}
-	ranks := make([]Rank, 0, 8)
-	for i := 0; i < length; i++ {
-		sum := 0.0
-		for j := 0; j < Width; j++ {
-			diff := y[i*Width+j] - x[j]
-			sum += diff * diff
+	test := func(t int) (correctness int) {
+		ranks := make([]Rank, 0, 8)
+		for i := 0; i < length; i++ {
+			sum := 0.0
+			for j := 0; j < Width; j++ {
+				diff := y[i*Width+j] - x[t*Width+j]
+				sum += diff * diff
+			}
+			ranks = append(ranks, Rank{
+				Index: i,
+				Value: math.Sqrt(sum),
+			})
 		}
-		ranks = append(ranks, Rank{
-			Index: i,
-			Value: math.Sqrt(sum),
+		sort.Slice(ranks, func(i, j int) bool {
+			return ranks[i].Value > ranks[j].Value
 		})
+		for i, value := range ranks {
+			if value.Index == i {
+				correctness = i
+				break
+			}
+		}
+		return correctness
 	}
-	sort.Slice(ranks, func(i, j int) bool {
-		return ranks[i].Value > ranks[j].Value
-	})
-	for _, value := range ranks {
-		fmt.Println(value.Index, value.Value)
+	correctness := 0
+	for i := 0; i < length; i++ {
+		correctness += test(i)
 	}
+	fmt.Println("correctness", float64(correctness)/float64(length))
 }
