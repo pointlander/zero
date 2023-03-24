@@ -619,7 +619,7 @@ func main() {
 			sum := 0.0
 			for j := 0; j < Width; j++ {
 				diff := y[i*Width+j] - x[t*Width+j]
-				sum += diff * diff
+				sum += math.Abs(diff)
 			}
 			ranks = append(ranks, Rank{
 				Index: i,
