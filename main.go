@@ -602,7 +602,7 @@ func main() {
 	englishVectors := vectors[:len(vectors)/2]
 	germanVectors := vectors[len(vectors)/2:]
 
-	entropyEnglish, x := se(rnd, "entropy_english", germanVectors, germanVectors, englishVectors)
+	entropyEnglish, x := se(rnd, "entropy_english", englishVectors, englishVectors, englishVectors)
 	entropyGerman, y := se(rnd, "german_english", englishVectors, englishVectors, germanVectors)
 
 	for i, value := range entropyEnglish {
