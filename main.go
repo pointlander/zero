@@ -613,7 +613,7 @@ func main() {
 		Index int
 		Value float64
 	}
-	test := func(e, x, y []float64, t int) (correctness int) {
+	test := func(x, y []float64, t int) (correctness int) {
 		ranks := make([]Rank, 0, 8)
 		for i := 0; i < length; i++ {
 			sum := 0.0
@@ -623,7 +623,7 @@ func main() {
 			}
 			ranks = append(ranks, Rank{
 				Index: i,
-				Value: e[i] * math.Sqrt(sum),
+				Value: math.Sqrt(sum),
 			})
 		}
 		sort.Slice(ranks, func(i, j int) bool {
@@ -639,13 +639,13 @@ func main() {
 	}
 	correctness := 0
 	for i := 0; i < length; i++ {
-		correctness += test(entropyEnglish, x, y, i)
+		correctness += test(x, y, i)
 	}
 	fmt.Println("correctness english", float64(correctness)/float64(length))
 
 	correctness = 0
 	for i := 0; i < length; i++ {
-		correctness += test(entropyGerman, y, x, i)
+		correctness += test(y, x, i)
 	}
 	fmt.Println("correctness german", float64(correctness)/float64(length))
 }
