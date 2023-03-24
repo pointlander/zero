@@ -362,8 +362,9 @@ func se(gradient bool, rnd *rand.Rand, name string, Q, K, V []float64) ([]float6
 		}
 	}
 
-	l1 = spherical(tf32.Mul(set.Get("q"), set.Get("k")))
-	l2 = spherical(tf32.Mul(tf32.T(set.Get("v")), l1))
+	l1 = tf32.Softmax(tf32.Mul(set.Get("q"), set.Get("k")))
+	l2a := tf32.Mul(tf32.T(set.Get("v")), l1)
+	l2 = tf32.Softmax(l2a)
 	cost = tf32.Entropy(l2)
 
 	e := make([]float64, 0, 8)
@@ -375,7 +376,7 @@ func se(gradient bool, rnd *rand.Rand, name string, Q, K, V []float64) ([]float6
 	})
 
 	vec := make([]float64, 0, 8)
-	l2(func(a *tf32.V) bool {
+	l2a(func(a *tf32.V) bool {
 		for _, value := range a.X {
 			vec = append(vec, float64(value))
 		}
@@ -634,11 +635,11 @@ func main() {
 			sum := 0.0
 			for j := 0; j < Width; j++ {
 				diff := y[i*Width+j] - x[t*Width+j]
-				sum += math.Abs(diff)
+				sum += diff * diff
 			}
 			ranks = append(ranks, Rank{
 				Index: i,
-				Value: sum,
+				Value: math.Sqrt(sum),
 			})
 		}
 		sort.Slice(ranks, func(i, j int) bool {
