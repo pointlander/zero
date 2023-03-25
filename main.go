@@ -646,6 +646,12 @@ func main() {
 		})
 		for i, value := range ranks {
 			if value.Index == t {
+				if i == 0 {
+					fmt.Println("perfect", wordsEnglish[value.Index], entropyEnglish[value.Index], entropyGerman[value.Index], value.Value)
+					for _, value := range ranks[i+1 : i+10] {
+						fmt.Println("next", wordsEnglish[value.Index], entropyEnglish[value.Index], entropyGerman[value.Index], value.Value)
+					}
+				}
 				correctness = i
 				break
 			}
